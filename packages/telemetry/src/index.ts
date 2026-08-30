@@ -5,4 +5,22 @@
  * our addition is the per-step token/cost/latency record the router and
  * `/cost` depend on.
  */
+export type {
+  CompactionEvent,
+  Layer,
+  LayerSwitchEvent,
+  LocalDegradedEvent,
+  RetrievalMissEvent,
+  StepEvent,
+  TelemetryEvent,
+  TelemetryEventType,
+  TokenUsage,
+  VerificationResult,
+} from "./events.ts";
+export { cacheHitRate, inputTokens, LAYERS, totalTokens } from "./events.ts";
+export type { ReadResult, SinkOptions, TelemetryMode } from "./sink.ts";
+export { JsonlSink, parseMode, readEvents } from "./sink.ts";
+export type { Validated, ValidationFailure, ValidationSuccess } from "./validate.ts";
+export { validateEvent } from "./validate.ts";
+
 export const PACKAGE = "telemetry" as const;
