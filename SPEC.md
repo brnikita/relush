@@ -1,172 +1,374 @@
 # Technical Specification: Token-Optimized Coding Agent CLI
 
-Version 1.0 — 2026-08-30
-Audience: **an autonomous coding agent (Claude Code)** executing this spec end-to-end, plus human reviewers.
-Working name: `nodrel` (CLI binary name; substitute via `BRAND` env in build if renamed).
+Version 2.0 — 2026-08-31
+Supersedes v1.0 (2026-08-30). Every change is justified by a measurement or a
+verified external fact; §0.1 lists them.
+Audience: **an autonomous coding agent (Claude Code)** executing this spec, plus
+human reviewers.
+Working name: `nodrel`.
 
 ---
 
-## 0. How to use this document (instructions to the coding agent)
+## 0. How to use this document
 
-1. Execute milestones **in order** (M0 → M5). Do not start a milestone until the previous one's acceptance gate passes.
-2. Every milestone ends with a runnable verification command. A milestone is DONE only when its command exits 0 and the metrics in its gate table are met.
-3. When this spec leaves a choice open, take the **Default** column. Log the decision in `docs/decisions/` as an ADR; do not ask for confirmation.
-4. Never commit secrets, provider keys, or user code samples. Keys come only from env vars listed in §10.
-5. All work in TypeScript strict mode unless a section says otherwise. Node ≥ 22. Package manager: `pnpm`.
-6. Write tests before or with implementation. CI target: `pnpm test && pnpm bench:smoke` green on every commit to `main`.
-7. Keep the core system prompt and tool schemas under the token budgets in §4.1. There is a CI check for this (`pnpm check:budgets`); it must never be disabled.
+1. Execute phases **in order** (P0 → P5). A phase is DONE only when its verify
+   command exits 0 and its gate table is met.
+2. Where this spec leaves a choice open, take the **Default** column and log an
+   ADR in `docs/decisions/`. Do not ask for confirmation.
+3. Never commit secrets. Keys come only from the env vars in §10.
+4. TypeScript strict mode, Node ≥ 22, pnpm. Eval harness in Python via `uv`.
+5. Write tests with the implementation. Every commit: `pnpm typecheck && pnpm
+   lint && pnpm test` green.
+6. `pnpm check:budgets` must never be disabled or weakened (§4.1).
+7. **A gate that fails on merit produces `docs/decisions/DEVIATION-<n>.md` and
+   stops the phase.** It is never quietly lowered.
+
+### 0.1 What changed from v1.0, and why
+
+v1.0 was written before any code existed. Building P0–P2 and measuring it
+invalidated six of its assumptions.
+
+| v1.0 said | Reality | Evidence |
+|---|---|---|
+| Fork `badlogic/pi-mono`, 4 packages | Repo is `earendil-works/pi`, 10 scoped packages, npm workspaces | Verified 2026-08-30 |
+| Kùzu is the default graph DB | **Kùzu was acquired by Apple (Oct 2025) and archived**; npm package deprecated | Repo `archived: true`, last release v0.11.3 |
+| XXH3 for content hashing | BLAKE2b in `node:crypto` is fast enough by 700× margin | 84 ms / 50 MB vs a 60 s budget |
+| Masking is a free win | **Masking as specified costs 14.9% more than not masking** | Measured, DEVIATION-002 |
+| Cheapest model per token wins | `ling-3.0-flash` is 3.6× cheaper and solves **nothing** in 200 s | Measured |
+| tree-sitter native bindings | `web-tree-sitter` (WASM) removes the last native dependency | Verified parsing |
+
+The masking result is the significant one. It is not a bug in the
+implementation; it is a flaw in v1.0's design, and §4.4 is rewritten around it.
 
 ---
 
 ## 1. Product summary
 
-A terminal coding agent equivalent in workflow to Claude Code (interactive TUI, agentic loop, file edits, bash, tests), but designed from the ground up to **minimize token consumption and latency**:
+A terminal coding agent equivalent in workflow to Claude Code, designed to
+minimize token consumption and latency:
 
-- Minimal harness overhead (system prompt + tools ≤ 2,000 tokens per request).
-- A local **code graph** replaces whole-file reads with budgeted structural retrieval.
-- **History management**: observation masking + hybrid summarization keeps long sessions cheap.
-- **Model routing** across three layers: local model → cheap cloud default → strong-model escalation.
-- Stable prompt prefix to maximize provider KV-cache hits.
+- Harness overhead (system prompt + core tools) ≤ 2,000 tokens per request.
+  **Currently 841.**
+- A local **code graph** replaces whole-file reads with budgeted structural
+  retrieval.
+- **Cache-first history management**: the transcript is append-only by default;
+  compaction happens in batches at stable boundaries, never per turn.
+- **Model routing** across three layers: local → cheap cloud → escalation.
+- A stable prompt prefix to maximize provider cache hits.
 
-Economic target (from the companion financial model): variable cost ≤ $14/month for a weighted user consuming 133M tokens/month, which requires blended cost ≤ ~$0.10 per 1M tokens and escalation share ≤ 15% of tokens.
+Economic target: blended cost ≤ ~$0.10 per 1M tokens with escalation ≤ 15% of
+tokens. **Measured baseline is already $0.023/M blended** (§7 P1), so the
+binding constraint is tokens per *solved task*, not price per token.
 
 ### 1.1 Foundation
 
-Fork of **Pi** (`badlogic/pi-mono`, MIT): packages `pi-ai` (LLM abstraction), `pi-agent-core` (agent loop, hooks), `pi-coding-agent` (CLI/TUI), `pi-tui`. Rationale: sub-1,000-token system prompt, 4 base tools, 20+ lifecycle hooks (`beforeToolCall`, `afterToolCall`, message transforms), runtime TypeScript extensions, RPC/SDK modes. Track upstream monthly; keep extension/skill format compatible.
+Built on **Pi** (`earendil-works/pi`, MIT, v0.84.4, actively maintained) as a
+**dependency, not a fork** (ADR-002). nodrel's packages attach through Pi's
+documented `AgentOptions` hooks:
 
-Reference research the design encodes (do not re-litigate these choices):
-- Observation masking matches LLM-summarization quality at zero extra compute; LLM summaries lengthen trajectories 13–15% by hiding failure signals (JetBrains, SWE-bench Verified). → masking is the default, summarization only on overflow.
-- Tree-sitter code knowledge graph over MCP: ~10x fewer tokens, 2.1x fewer tool calls, at ~9pp answer-quality cost (Codebase-Memory, arXiv 2603.27277). → graph retrieval must be budgeted and expandable-on-demand to claw back the quality gap.
-- Tool-description overhead: filtering 29 tools → relevant subset cut description tokens 82% and selection errors 89%. → lazy skills + semantic tool selection.
-- Model routing 70/20/10 (cheap/mid/strong) ≈ 25–30% of all-frontier cost. → router is a first-class component.
+| nodrel need | Pi hook | Verified capability |
+|---|---|---|
+| Masking, compaction, prefix pinning | `transformContext` | Rewrites messages before each request |
+| Tool-output compression | `afterToolCall` | Replaces result content in full |
+| Tool interception | `beforeToolCall` | Returns `{ block, reason }` |
+| **Per-step layer selection** | `prepareNextTurnWithContext` | `AgentLoopTurnUpdate.model` |
+| Telemetry | `subscribe`, `onResponse` | Lifecycle events with usage |
+
+Pi also supplies `read`/`write`/`edit`/`bash` implementations and a built-in
+`openrouter` provider whose `streamSimple` matches its own `StreamFn`. This is
+why P0 required one adapter rather than a fork.
+
+### 1.2 Research this design encodes
+
+Do not re-litigate these.
+
+- **Observation masking** matches LLM-summarization quality at zero extra
+  compute; summaries lengthen trajectories 13–15% by hiding failure signals
+  (JetBrains, SWE-bench Verified). **Confirmed locally**: masking cost no
+  quality (100% solve rate both ways) and no extra turns (15.5 both ways).
+- **Compaction invalidates prefix caches.** Pruning and eviction mutate the
+  sequence and cause prefix mismatch; the fix is stabilizing prefixes at
+  ingestion and evicting on a conservative batch schedule, not per turn
+  (TokenPilot, arXiv 2606.17016 — 61%/87% cost reduction). **Independently
+  rediscovered here before the paper was found**; §4.4 follows its principle.
+- **Append-only ordering.** Any modification to earlier content invalidates the
+  cache from that point on. Order content most-stable to least-stable, with
+  dynamic data last.
+- **Tree-sitter code graph over MCP**: ~10× fewer tokens, 2.1× fewer tool calls,
+  ~9pp answer-quality cost. Graph retrieval must be budgeted and
+  expandable-on-demand to claw the quality back.
+- **Tool-description overhead**: filtering 29 tools to a relevant subset cut
+  description tokens 82% and selection errors 89%.
+- **Model routing 70/20/10** ≈ 25–30% of all-frontier cost.
 
 ---
 
 ## 2. Scope
 
-**In scope (v1):** CLI harness (interactive TUI, `--print/--json`, RPC, SDK); graph indexer + context engine; history manager; router; local-model runtime; cloud gateway client; telemetry; eval harness; installer script.
-**Out of scope (v1):** web UI, team features, model hosting, Windows-native (WSL only), IDE plugins beyond RPC, the billing backend itself (client-side hooks only, server is a separate repo).
+**In scope (v1):** CLI harness (TUI, `--print/--json`, RPC, SDK); graph indexer
+and context engine; cache-first history manager; router; local-model runtime;
+telemetry; eval harness; installer.
+
+**Out of scope (v1):** web UI, team features, model hosting, IDE plugins beyond
+RPC, the billing backend (client hooks only).
 
 ---
 
 ## 3. Architecture
 
 ```
-┌────────────────────────────── user machine ──────────────────────────────┐
-│  CLI / TUI / RPC / SDK  (pi fork)                                        │
-│        │                                                                 │
-│  Agent Loop ── hooks ──┬─ Context Engine ── Graph Store (Kùzu, .agent/)  │
-│        │               ├─ History Manager (mask / summarize / compress)  │
-│        │               ├─ Tool Layer (4 core tools + lazy skills + LSP)  │
-│        │               └─ Telemetry (JSONL, per-step tokens & cost)      │
-│        ▼                                                                 │
-│  Router ──► Local Runtime (Ollama/llama.cpp/MLX)                         │
-│        └──► Gateway client ──► cloud: GLM-5.3-Flash (default),           │
-│                                GLM-5.3 (escalation), fallbacks, BYOK     │
-└──────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────── user machine ───────────────────────────┐
+│  CLI / TUI / RPC / SDK                                            │
+│        │                                                          │
+│  Pi Agent Loop ── hooks ──┬─ Context Engine ── GraphStore (SQLite) │
+│        │                  ├─ History Manager (cache-first)        │
+│        │                  ├─ Tool Layer (5 core + lazy skills)    │
+│        │                  └─ Telemetry (JSONL, per-step cost)     │
+│        ▼                                                          │
+│  Router ──► Local Runtime (Ollama)                                │
+│        └──► OpenRouter ──► flash (default) / escalation / BYOK    │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-Monorepo layout (pnpm workspaces):
+Monorepo (pnpm workspaces), nine packages, all present:
 
 ```
 packages/
-  core/          # fork of pi-agent-core + our loop extensions
-  ai/            # fork of pi-ai; add gateway provider, cost tables
-  cli/           # fork of pi-coding-agent; TUI, /commands
-  graph/         # indexer (tree-sitter + SCIP) + Kùzu store + query API
-  context/       # context engine: budgeted retrieval, task map
-  history/       # masking, summarization, compression, prefix pinning
-  router/        # layer selection, fallbacks, budget accounting
-  local/         # local model runtime adapters + hardware detection
-  telemetry/     # event schema, JSONL sink, /cost aggregation
-eval/            # python eval harness (SWE-bench subset, Terminal-Bench subset)
-scripts/         # install.sh, budget checks, release
-docs/decisions/  # ADRs
+  core/       # hook composition, system prompt, tool schemas, agent assembly
+  ai/         # provider client, tokenizer, cost tables
+  cli/        # TUI, slash commands, task runner
+  graph/      # web-tree-sitter indexer + SQLite GraphStore
+  context/    # budgeted retrieval, task map
+  history/    # content cache, batched compaction, prefix pinning
+  router/     # layer selection, fallbacks, budget accounting
+  local/      # hardware detection, Ollama adapter
+  telemetry/  # event schema, JSONL sink, aggregation
+eval/         # Python harness (uv), task suites, reports
+docs/decisions/
 ```
 
 ### 3.1 Per-step data flow
 
-1. User prompt → **Router** classifies the step (rules + session signals; §8).
-2. **Context Engine** builds a *task map* (repo-map + top-k graph nodes) within budget; no LLM call needed.
-3. **History Manager** assembles messages: old tool outputs masked, prefix pinned, overflow summarized.
-4. **Tool Layer** exposes 5 core tools + top-k relevant skills (one-line stubs for the rest).
-5. Request goes to the selected layer. Response/tool-calls/test-results are logged with tokens, cost, latency.
-6. Failure signals (failed tests, repeated edits to the same symbol, >N files touched) update router state; two consecutive failures ⇒ escalate next step.
+1. Router classifies the step (rules + session signals; §8).
+2. Context Engine builds a task map within budget. No LLM call.
+3. History Manager assembles messages **append-only**; compaction runs only when
+   §4.4's trigger fires.
+4. Tool Layer exposes 5 core tools + top-k relevant skills.
+5. Request goes to the selected layer; usage, cost and latency are logged.
+6. Failure signals update router state; two consecutive failures escalate.
 
 ---
 
 ## 4. Component requirements
 
-### 4.1 Harness core (`packages/core`, `cli`)
+### 4.1 Harness core
 
-- Core system prompt ≤ **800 tokens**. Default tools: `read`, `write`, `edit`, `bash`, `graph_query`. Everything else is a skill loaded lazily.
-- Total fixed overhead (system prompt + core tool schemas + pinned instructions) ≤ **2,000 tokens**; enforced by `scripts/check-budgets.ts` counting with the target model's tokenizer.
-- Modes: interactive TUI; `--print` / `--json`; `--rpc` (JSON-RPC over stdio for IDEs); importable SDK.
-- Sessions: JSONL tree (branch/fork/compact preserved from Pi). Each record adds: `layer` (local|flash|escalation|byok), `model`, `provider`, `tokens_in`, `tokens_cached`, `tokens_out`, `cost_usd`, `latency_ms`.
-- On first run, import rules/skills/MCP config from `.claude/`, `.cursor/`, `.codex/`, `.cline/` if present (read-only import, never modify those dirs).
-- Slash commands: `/cost` (session + week totals by layer), `/model` (pin layer), `/fast`, `/strong`, `/compact`, `/expand <hash>`, `/graph <query>`, `/reindex`.
-- Output style: terse by default. Post-instruction cap: explanations ≤ 3 sentences unless the user asks; target ≥ 40% output-token reduction vs. un-instructed baseline (measured in eval).
+- Core system prompt ≤ **800 tokens**. Total fixed overhead (prompt + core tool
+  schemas + pinned instructions) ≤ **2,000 tokens**, enforced by
+  `scripts/check-budgets.ts`. **Current: 331 and 841.**
+- Default tools: `read`, `write`, `edit`, `bash`, `graph_query`. Everything else
+  is a lazily-loaded skill.
+- Modes: interactive TUI; `--print`/`--json`; `--rpc`; importable SDK.
+- Slash commands: `/cost`, `/model`, `/fast`, `/strong`, `/compact`,
+  `/expand <id>`, `/graph <query>`, `/reindex`.
+- On first run, import rules and skills from `.claude/`, `.cursor/`, `.codex/`,
+  `.cline/` if present. Read-only.
+- Output style terse: explanations ≤ 3 sentences unless asked. Target ≥ 40%
+  output-token reduction versus un-instructed baseline.
 
-### 4.2 Graph indexer & store (`packages/graph`)
+### 4.2 Graph indexer and store
 
-- Parsers: **tree-sitter** for broad coverage (≥ 15 languages at v1: ts/js/tsx, python, go, java, c, cpp, c#, rust, ruby, php, kotlin, swift, bash, json/yaml); **SCIP** indexers for precise references where available (scip-typescript, scip-python, scip-go at v1; others post-v1). SCIP failure ⇒ warn and fall back to tree-sitter.
-- Node types: `file, module, class, function, method, type, test, commit`. Edge types: `imports, calls, references, inherits, implements, tests, modified_in, co_changed_with`.
-- Store: **Kùzu** embedded (Default) behind a `GraphStore` interface; SQLite implementation kept as fallback (both must pass the same conformance test suite). Data lives in `<repo>/.agent/graph/`; never leaves the machine.
-- Incremental indexing: XXH3 content hashes + git diff; fs watcher; incremental run ≥ 4x faster than full.
-- Enrichment (background, local model only, skippable): one-line NL description + embedding per function/class node, stored for `search(nl_query)`. If no local model: `search` degrades to identifier/token match — never call cloud for enrichment.
-- Derived metrics: node degree (hot "god nodes"), community/module detection, `impact(diff)` = transitively affected nodes.
-- Performance gates: full index of a 1M-LOC repo ≤ 60 s; incremental ≤ 5 s; any query p95 ≤ 100 ms (measured in `pnpm bench:graph` on the pinned corpus: three OSS repos ~100k/1M/10M LOC, vendored by commit hash in `eval/corpus.lock`).
-- Also expose the graph as an **MCP server** (secondary distribution channel; same query API).
+- **Parsers: `web-tree-sitter` (WASM).** Grammar packages ship prebuilt `.wasm`,
+  so no compiler is required. ≥ 15 languages at v1.
+- **Store: SQLite via `node:sqlite`** (built into Node 22+), behind a
+  `GraphStore` interface with a conformance suite. **Kùzu is removed** — the
+  project was acquired by Apple in October 2025 and archived, and the only
+  active fork (`ryugraph`) has 143 stars, no commits since January 2026, and the
+  same native build requirements. Depending on either is unacceptable for a core
+  component. See ADR-001.
+- **The project has no native dependencies.** This is a hard property, not an
+  accident: it is what lets nodrel build on Windows, macOS and Linux without a
+  C++ toolchain. Any proposed dependency requiring `node-gyp` or `cmake-js`
+  needs an ADR arguing why the portability loss is worth it.
+- Node types: `file, module, class, function, method, type, test, commit`.
+  Edges: `imports, calls, references, inherits, implements, tests, modified_in,
+  co_changed_with`.
+- Content hashing: **BLAKE2b** from `node:crypto`, truncated to 128 bits
+  (ADR-003).
+- Incremental indexing: content hashes + git diff + fs watcher. Incremental
+  ≥ 4× faster than full.
+- Graph traversal uses recursive CTEs. `impact(diff)` and transitive
+  `references` are the queries most at risk of missing the p95 gate; benchmark
+  them first.
+- Enrichment (background, local model only, skippable): one-line description and
+  embedding per symbol. **Never call a cloud model for enrichment.** Without a
+  local model, `search` degrades to identifier matching.
+- Performance gates: full index of 1M LOC ≤ 60 s; incremental ≤ 5 s; query
+  p95 ≤ 100 ms, on the pinned corpus.
+- Also expose the graph as an MCP server.
 
-### 4.3 Context engine (`packages/context`)
+### 4.3 Context engine
 
-- Tool `graph_query` operations: `overview(path)`, `symbol(name, depth)`, `references(name)`, `dependencies(name)`, `impact(diff)`, `tests_for(name)`, `search(nl_query, k)`.
-- **Every response is token-budgeted** (default 4,000; per-call override). Over budget ⇒ rank by relevance + proximity to current focus; the tail is returned as opaque ids expandable via `expand(id)`.
-- Response format: compressed signatures (name, params, types, first docstring line) — never full bodies; a body is a separate explicit fetch.
-- **Task map**: before the first model call of a task, deterministically assemble Aider-style repo-map + top-k nodes matching the prompt; inject as pinned context. No LLM call.
-- Retrieval-miss logging: if the model reads a whole file after a `graph_query` covering it, emit `retrieval_miss` with both ids (feeds tuning).
+- `graph_query` operations: `overview(path)`, `symbol(name, depth)`,
+  `references(name)`, `dependencies(name)`, `impact(diff)`, `tests_for(name)`,
+  `search(nl_query, k)`, `expand(id)`.
+- **Every response is token-budgeted** (default 4,000). Over budget, rank by
+  relevance and proximity to the current focus; return the tail as opaque ids.
+- Responses are compressed signatures — name, params, types, first docstring
+  line. **Never bodies.** A body is a separate explicit fetch.
+- **Task map**: before the first model call, deterministically assemble a
+  repo-map plus top-k matching nodes. No LLM call. Byte-identical for identical
+  input, because it is part of the pinned prefix (§4.4).
+- Retrieval-miss logging: if the model reads a whole file after a `graph_query`
+  covering it, emit `retrieval_miss`.
 
-### 4.4 History manager (`packages/history`)
+### 4.4 History manager — cache-first
 
-- **Observation masking** (Default ON): tool outputs older than `N=6` turns → `[output masked: <tokens> tokens, sha=<xxh3>]`; call + args stay; original cached locally, retrievable via `expand`.
-- **Hybrid summarization**: only when context > 60% of the model window AND turns older than `M=20` exist; summarize those turns with the **local model** when available, else the flash layer; failure signals (failed tests, errors) are preserved verbatim in the summary.
-- **Tool-output compression** before history insertion: AST-aware for code (drop bodies of unchanged functions in diffs/reads), structural for JSON (SmartCrusher-style key sampling), line-level verbatim scoring for logs. **No token-level pruning** (breaks code syntax). All compression reversible: originals in `.agent/cache/`, keyed by hash.
-- **Prefix pinning**: system prompt, core tool schemas, and task map are byte-stable for the whole session; all dynamic content appends after them. CI test asserts prefix stability across 50 synthetic turns.
-- Optional dependency: evaluate `headroom-ai` as a library for compression in M1; if adopted, wrap behind our interface (ADR required).
+**This section is rewritten. v1.0's design is measurably a cost regression.**
 
-### 4.5 Router (`packages/router`)
+#### The problem
 
-- Layers: `local` (hardware-dependent), `flash` = GLM-5.3-Flash via gateway (≥ 3 providers configured), `escalation` = GLM-5.3; reserve escalation = Kimi K3; `byok` = user-supplied Anthropic/OpenAI/OpenRouter keys.
-- Decision inputs: rule-based task class (regex/AST features of the prompt), `impact()` size, session failure state, explicit `/fast`/`/strong`, remaining user budget from gateway.
-- Local-by-default step types: graph enrichment, summarization, commit messages, templated test generation, single-symbol edits when tests exist.
-- Escalation triggers: 2 consecutive failed verification runs; `impact()` > 12 files; user `/strong`. De-escalate after 2 consecutive green steps.
-- Fallbacks: 429/timeout ⇒ next provider of same model; model down ⇒ adjacent layer; every switch logged and surfaced in TUI (`layer` badge per step).
-- Budget accounting: 5-hour rolling window + weekly cap fetched from gateway; **local tokens do not count** against caps.
-- Hard invariant (CI-tested): escalation share of tokens over the eval suite ≤ 15%.
+Providers cache on exact prefix match. Modifying any message invalidates the
+cache for that message and everything after it. On every model in the
+OpenRouter catalogue the cached rate is exactly **0.2× the fresh rate**, so a
+cache miss on a suffix of `S` tokens costs `0.8 × S` extra.
 
-### 4.6 Local runtime (`packages/local`)
+Masking a message of `T` tokens saves `(T − 25)` tokens, but only at the cached
+rate on subsequent requests. Break-even per masking event, with `R` subsequent
+requests before the next invalidation:
 
-- Hardware detection (VRAM / unified memory) → profile: 16 GB → `gpt-oss-20b`; 24 GB → `qwen3.6-35b-a3b` (Default) or `qwen3.6:27b`; 64 GB → `qwen3-coder-next-80b-a3b`; <16 GB → cloud-only.
-- Backends: Ollama (Default), llama.cpp, MLX — all via OpenAI-compatible endpoint registered as a `pi-ai` custom provider with `cost: 0`.
-- Graceful degradation: local unavailable ⇒ route to flash without interrupting the session; emit `local_degraded` event.
+```
+(T − 25) × 0.2 × R  ≥  S × 0.8
+```
+
+v1.0's sliding 6-turn window re-masks on **every turn**, so `R = 1` and the
+threshold becomes `T ≥ 4S + 25`. With a 10,000-token suffix an output would have
+to exceed 40,000 tokens to pay for itself. v1.0 set the threshold at 50 tokens —
+three orders of magnitude too low.
+
+Measured consequence (`longhorizon` suite, identical tasks):
+
+| | masking off | masking on |
+|---|---|---|
+| tokens/task | 32,148 | 29,140 (−9.4%) |
+| cache hit | 93.8% | 83.2% |
+| **cost/task** | **$0.00074** | **$0.00085 (+14.9%)** |
+
+#### The design
+
+**Rule 1 — Append-only by default.** The transcript is never rewritten in the
+ordinary path. Content is ordered most-stable to least-stable: system prompt,
+tool schemas, task map, then conversation.
+
+**Rule 2 — Compaction is batched, not continuous.** Compaction fires only when
+context exceeds **60% of the model window**. When it fires it compacts a
+contiguous prefix of old turns in one operation, then leaves the result
+untouched until the next trigger. This pays one cache invalidation per batch
+instead of one per turn, raising `R` from 1 to typically 20–50.
+
+**Rule 3 — Size threshold from the break-even, not a constant.** An output is
+compacted only if `T ≥ 4S / R_expected`, where `S` is the suffix length at the
+compaction point. Implementations must compute this, not hardcode it.
+
+**Rule 4 — Compaction is reversible.** Originals are stored content-addressed
+in `.agent/cache/`, retrievable via `expand(id)` byte-identically. Content is
+held as bytes, never as decoded strings.
+
+**Rule 5 — Failure signals survive verbatim.** Failed tests, stack traces and
+error output are never compacted away, whatever their size. This is what makes
+masking safer than summarization; discarding it discards the reason for the
+choice.
+
+**Rule 6 — Prefix pinning.** System prompt, tool schemas and task map are
+byte-stable for the whole session. Tool schemas serialize with sorted keys, since
+`JSON.stringify` follows insertion order. A CI test asserts stability across 50
+synthetic turns.
+
+**Tool-output compression** before insertion: AST-aware for code (drop bodies of
+unchanged functions), structural for JSON, line-scored for logs. **No
+token-level pruning** — it breaks code syntax. Compression at ingestion is
+preferred over compaction later, because it never invalidates a cache.
+
+**Gate**: any compaction strategy must be demonstrated to **reduce cost per
+solved task**, not merely tokens, on the `longhorizon` suite. Token reduction
+alone is not evidence of an improvement.
+
+### 4.5 Router
+
+- Layers: `local` (hardware-dependent), `flash` (default cloud),
+  `escalation`, `byok`.
+- Decision inputs: rule-based task class, `impact()` size, session failure
+  state, explicit `/fast` / `/strong`, remaining budget.
+- Local-by-default steps: graph enrichment, summarization, commit messages,
+  templated test generation, single-symbol edits with existing tests.
+- Escalation triggers: two consecutive failed verification runs; `impact()` > 12
+  files; explicit `/strong`. De-escalate after two consecutive green steps.
+- Fallbacks: retry the same model twice with backoff, then move to the next in
+  the chain. Fall back on 429, 408, 5xx, timeouts and **model-specific 400s**
+  (an unknown model id is model-specific; a malformed body is not). Never fall
+  back on 401.
+- Budget accounting: 5-hour rolling window plus weekly cap. **Local tokens do
+  not count.**
+- Hard invariant, CI-tested: escalation ≤ **15% of tokens** over the eval suite.
+
+### 4.6 Local runtime
+
+- Hardware detection → profile: < 16 GB VRAM → cloud-only; 16 GB →
+  `gpt-oss-20b`; 24 GB → `qwen3.6-35b-a3b`; 64 GB → `qwen3-coder-next-80b-a3b`.
+- Backends: Ollama (Default), llama.cpp, MLX, registered as an
+  OpenAI-compatible provider with `cost: 0`.
+- Graceful degradation: local unavailable ⇒ route to flash, emit
+  `local_degraded`, do not interrupt the session.
+- **The reference machine has 12 GB VRAM and cannot host the 24 GB profile.**
+  The local layer is developed against a simulated profile and every report is
+  stamped `hardware: simulated`. The §6 local-share KPI is **not claimable**
+  here and requires a 24 GB machine.
 
 ### 4.7 Tool layer
 
-- Semantic skill selection: local embeddings over skill descriptions (FAISS/HNSW in-process), top-k=5 per step; unselected skills appear as one-line stubs only.
-- LSP operations (port from oh-my-pi): rename via `workspace/willRenameFiles`, post-edit diagnostics, go-to-definition as graph alternative for strong-LSP languages.
-- Test runner tool: detects framework (vitest/jest/pytest/go test/cargo), runs targeted tests from `tests_for()`, returns structured pass/fail to the router.
+- Semantic skill selection: local embeddings over skill descriptions, top-k = 5
+  per step. Unselected skills appear as one-line stubs.
+- LSP operations: rename via `workspace/willRenameFiles`, post-edit diagnostics,
+  go-to-definition for strong-LSP languages.
+- Test runner tool: detects the framework, runs targeted tests from
+  `tests_for()`, returns structured pass/fail to the router.
 
-### 4.8 Gateway client (`packages/ai` addition)
+### 4.8 Provider layer
 
-- Auth by device token (`NODREL_TOKEN`); provider API keys exist **only** server-side; BYOK keys stay in local keychain.
-- Client duties: usage sync (window/weekly), price table refresh, provider health hints, free-plan BYOK passthrough (client talks to user's OpenRouter key directly; gateway gets metrics only).
-- All gateway calls are non-blocking with a 500 ms budget; offline ⇒ cached limits + local-only or BYOK mode.
+- Default provider OpenRouter; BYOK keys in the OS keychain.
+- Usage split: `prompt_tokens` is **inclusive of cached tokens**. Store them
+  separately or the cache-hit KPI is unmeasurable and cached tokens are
+  overcharged.
+- **Reasoning models spend the completion budget before answering.** Results
+  must carry `reasoning`, `finishReason` and reasoning token counts; a truncated
+  response is a budget problem, not a wrong answer, and must be distinguishable
+  from one.
+- Gateway client (P5): device-token auth, usage sync, price refresh, non-blocking
+  with a 500 ms budget; offline ⇒ cached limits and local-only or BYOK.
 
-### 4.9 Telemetry & eval (`packages/telemetry`, `eval/`)
+### 4.9 Telemetry and eval
 
-- Event schema (JSONL, local, opt-in upload of aggregates only): step id, layer, model, provider, tokens (in/cached/out), cost, latency, verification result, retrieval misses, compaction events.
-- Eval harness (Python, `uv`-managed): runners for **SWE-bench Verified-50** and **Terminal-Bench 2.1 subset (20 tasks)** + 30 internal tasks; per-release report: solve rate, tokens/task, cost/task, escalation share, vs. the frozen M0 baseline. Seeds fixed; 3 runs; report mean ± sd.
-- `pnpm bench:smoke`: 5 cheap tasks, runs in CI on every PR.
+- Event schema (JSONL, local, opt-in aggregate upload): step id, layer, model,
+  provider, tokens (fresh/cached/output), cost, latency, verification result,
+  retrieval misses, compaction events.
+- Writes are synchronous and append-only; reads tolerate a torn trailing line
+  from a crash.
+- **Eval measures cost per solved task, and per-task wall time.** Price per
+  token is not a metric: `ling-3.0-flash` is 3.6× cheaper per token than the
+  default and failed to solve a one-line bug in 200 s, where the default
+  succeeded in 18 s.
+- Every task carries a verification command whose exit status decides the
+  outcome. **No model judges its own work.** A task that edits the test instead
+  of the source fails.
+- Suites: `smoke` (5 tasks, fast), `internal` (≥ 30 tasks), `longhorizon`
+  (≥ 10 tasks of ≥ 15 turns), `swebench` (Verified-50, Docker).
+- **`longhorizon` is mandatory for any history-manager claim.** Short tasks
+  cannot exercise compaction: the `internal` suite averages 5.1 turns and the
+  history manager never engaged on it.
+- Multi-seed runs report mean ± sd. Three seeds minimum for a frozen report.
+- The runner must not report success when the model produced no usable output.
+  A run with zero tokens and zero tool calls is a failure regardless of whether
+  an exception was thrown.
 
 ---
 
@@ -174,93 +376,140 @@ docs/decisions/  # ADRs
 
 | Area | Requirement |
 |---|---|
-| Privacy | Source code never leaves the machine except prompt fragments explicitly assembled for a step; graph, embeddings, caches local; full-offline mode on local layer. Secret scanner (gitleaks rules) runs on every outbound prompt; matches are redacted and logged. |
-| Speed | Cold start on an indexed repo ≤ 2 s; graph query p95 ≤ 100 ms; TTFT overhead added by harness ≤ 150 ms over raw provider call. |
-| Reliability | Survive any provider outage without losing the session; crash-safe session state (resume after kill -9 mid-tool-call). |
-| Portability | macOS (Apple Silicon), Linux x64/arm64; Windows via WSL. |
-| Licensing | Core MIT (Pi heritage); deps MIT/Apache-2; AGPL deps forbidden in distributed binaries; model licenses reviewed before default-config inclusion (Kimi K3 License: reserve only). |
-| Security | `bash` behind allow-list/confirmation modes; tool-call audit log; no `eval` of remote code in extensions without user opt-in. |
+| Privacy | Source never leaves the machine except prompt fragments for a step. Graph, embeddings and caches stay local. A secret scanner runs on every outbound prompt; matches are redacted and logged. |
+| Portability | **No native dependencies.** macOS, Linux, and Windows natively. POSIX shell scripts are exercised on CI runners. |
+| Speed | Cold start on an indexed repo ≤ 2 s; graph query p95 ≤ 100 ms; harness-added TTFT overhead ≤ 150 ms. |
+| Reliability | Survive any provider outage without losing the session; crash-safe state, resumable after `kill -9` mid-tool-call. |
+| Licensing | Core MIT. Dependencies MIT/Apache-2. No AGPL in distributed binaries. **No archived or deprecated dependencies in the core path.** |
+| Security | `bash` behind allow-list or confirmation; tool-call audit log; no `eval` of remote code without opt-in. |
 
 ---
 
-## 6. KPIs (product-level, measured by `eval/`)
+## 6. KPIs
+
+Measured by `eval/`, against the frozen P1 baseline.
 
 | Metric | Target | Gate |
 |---|---|---|
-| Tokens per solved task (SWE-bench-50, flash layer) | ≤ 35% of M0 baseline | M3 |
-| Solve rate (same subset) | ≥ 90% of M0 baseline | M3 |
-| Escalation share of tokens | ≤ 15% (goal 10%) | M3 |
-| Fixed prompt overhead | ≤ 2,000 tokens | M1, then every CI run |
-| Provider cache-hit rate | ≥ 75% of input tokens | M1 |
-| Local-layer token share (24 GB profile) | ≥ 30% | M3 |
-| Full index 1M LOC / incremental / query p95 | ≤ 60 s / ≤ 5 s / ≤ 100 ms | M2 |
-| Output tokens vs. un-instructed baseline | −40% | M1 |
+| **Cost per solved task** (`longhorizon`) | ≤ 50% of baseline | P2 |
+| Tokens per solved task (`internal`) | ≤ 35% of baseline | P3 |
+| Solve rate | ≥ 95% of baseline | every phase |
+| Escalation share of tokens | ≤ 15% | P4 |
+| Fixed prompt overhead | ≤ 2,000 tokens | every CI run |
+| Provider cache-hit rate | ≥ 90% of input tokens | P2 |
+| Local-layer token share (24 GB profile) | ≥ 30% | P4, simulated |
+| Full index 1M LOC / incremental / query p95 | ≤ 60 s / ≤ 5 s / ≤ 100 ms | P3 |
+| Output tokens vs un-instructed | −40% | P2 |
+
+Two targets are raised from v1.0 because the baseline already beats them:
+cache-hit (75% → 90%, measured 88.4%) and the headline economic metric, which
+moves from tokens to **cost per solved task** — the masking result showed those
+can move in opposite directions.
 
 ---
 
-## 7. Milestones (execution plan for the agent)
+## 7. Phases
 
-### M0 — Fork, baseline, harness of record (est. 2 weeks)
-Tasks: fork pi-mono into the monorepo layout; wire pnpm workspaces + CI (lint, typecheck, tests, `check:budgets` stub); implement telemetry event schema + `/cost`; build `eval/` with the three suites and pinned corpus; register GLM-5.3-Flash via OpenRouter as default model; run and **freeze the baseline report** (`eval/reports/m0-baseline.json`).
-Gate: eval harness produces solve-rate/tokens/cost for all 3 suites, 3 seeds; report committed; `pnpm test` green.
+### P0 — Foundation ✅ DONE
+
+Workspace, strict TypeScript, Biome, Vitest, CI, MIT licence, nine packages,
+Pi integration through hooks, runnable agent.
+Verify: `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
+
+### P1 — Measurement ✅ DONE
+
+Telemetry schema and sink, tokenizer calibrated to within 2% of provider usage,
+cost tables, budget checker, provider client with fallback chain, `/cost`, eval
+harness, frozen baseline.
+
+Baseline (`internal`, 8 tasks × 3 seeds, `z-ai/glm-5.3-flash`):
+solve rate 100%, 7,189 tokens/task, $0.00025/task, 88.4% cache hit, 5.0 turns.
+`longhorizon` (2 tasks): 32,148 tokens/task, $0.00074/task, 93.8% cache, 15.5 turns.
+
 Verify: `pnpm eval:baseline && pnpm test`
 
-### M1 — History manager + terse output (est. 3 weeks)
-Tasks: masking (N=6) with `expand`; hybrid summarization (60% window, M=20, failure-signal preservation); reversible compression per content type (decide headroom-ai vs. in-house, write ADR); prefix pinning + stability test; terse-output instruction + eval; budget checker enforcing §4.1.
-Gate: on SWE-bench-50: tokens/task ≤ 60% of M0, solve rate ≥ 95% of M0; cache-hit ≥ 70%; output tokens −40%; prefix-stability test green.
-Verify: `pnpm eval:compare --against m0 --suite swe50 && pnpm check:budgets`
+### P2 — Cache-first history manager ⬅ CURRENT
 
-### M2 — Graph indexer + context engine (est. 6 weeks; may start in parallel after M0)
-Tasks: `GraphStore` interface + Kùzu impl + SQLite fallback + conformance tests; tree-sitter pipeline (15 langs) + SCIP (ts/py/go); incremental hashing + watcher; `graph_query` with budgets + `expand`; task map; retrieval-miss logging; `bench:graph` on pinned corpus; MCP server wrapper; ADR: Kùzu-vs-SQLite benchmark results.
-Gate: performance table of §4.2 met; on SWE-bench-50 with M1+M2 combined: tokens/task ≤ 42% of M0 (i.e., −30% on top of M1), solve rate ≥ 92% of M0.
-Verify: `pnpm bench:graph && pnpm eval:compare --against m0 --suite swe50`
+Tasks: expand `longhorizon` to ≥ 10 tasks; implement batched compaction per
+§4.4 with the computed threshold; ingestion-time compression per content type;
+prefix pinning already done; terse output instruction.
 
-### M3 — Router + local runtime (est. 4 weeks)
-Tasks: rule classifier + session-signal state machine; layer config incl. 3 flash providers with health checks and cache-hit verification per provider; escalation/de-escalation logic; hardware detection + Ollama adapter (llama.cpp/MLX best-effort); `/fast /strong /model`; budget sync stub against a mock gateway.
-Gate: full KPI table of §6 rows 1–3, 6 met on the 24 GB reference machine profile (simulate via env if hardware absent, and mark report accordingly).
-Verify: `pnpm eval:full --against m0`
+**Gate**: cost/task ≤ 50% of baseline on `longhorizon`; cache hit ≥ 90%; solve
+rate ≥ 95% of baseline; output tokens −40%; prefix-stability test green.
+Verify: `pnpm eval:compare --against p1 --suite longhorizon && pnpm check:budgets`
 
-### M4 — Gateway client, limits, installer (est. 3 weeks)
-Tasks: device-token auth flow; usage windows (5 h + weekly) enforced client-side from gateway data; BYOK (OpenRouter/Anthropic/OpenAI) via keychain; `curl -fsSL <domain> | sh` installer building per-platform binaries (bun compile or pkg); offline mode.
-Gate: contract tests against the mock gateway pass; installer produces a working binary on macOS-arm64 and linux-x64 CI runners; offline mode completes a local-layer task.
-Verify: `pnpm test:gateway && scripts/install-e2e.sh`
+### P3 — Graph indexer and context engine
 
-### M5 — Closed beta hardening (est. 4 weeks)
-Tasks: crash-recovery tests; secret-scanner integration; docs (README, extension guide); telemetry aggregate opt-in upload; triage & fix regressions from 3 pilot repos; final eval report.
-Gate: all §6 KPIs met; zero P0/P1 bugs open; final report `eval/reports/v1.json` committed.
-Verify: `pnpm eval:full --against m0 && pnpm test:all`
+Tasks: `GraphStore` interface and conformance suite; SQLite implementation;
+`web-tree-sitter` indexer (TS/JS first, then 15 languages); incremental
+indexing; `graph_query` with budgets and `expand`; task map; retrieval-miss
+logging; `bench:graph`; MCP server. SCIP indexers for ts/py/go where available.
+
+**Gate**: §4.2 performance table met; tokens per solved task ≤ 35% of baseline;
+solve rate ≥ 95% of baseline.
+Verify: `pnpm bench:graph && pnpm eval:compare --against p1`
+
+### P4 — Router and local runtime
+
+Tasks: rule classifier plus a labelled 500-prompt set; layer config with health
+checks; escalation state machine; budget accounting; Ollama adapter and hardware
+detection; `/fast`, `/strong`, `/model`; layer badge in the TUI.
+
+**Gate**: KPI rows 1–4 met. Report stamped `hardware: simulated` (§4.6).
+Verify: `pnpm eval:full --against p1`
+
+### P5 — Gateway, installer, hardening
+
+Tasks: device-token auth; usage windows; BYOK via keychain; `curl | sh`
+installer with per-platform binaries; offline mode; secret scanner; crash
+recovery; config import; docs; final report.
+
+**Gate**: all §6 KPIs met; zero P0/P1 bugs; `eval/reports/v1.json` committed.
+Verify: `pnpm eval:full --against p1 && pnpm test:all && scripts/install-e2e.sh`
 
 ---
 
-## 8. Defaults for open questions (agent: pick these, write ADRs)
+## 8. Defaults for open questions
 
 | Question | Default | Revisit trigger |
 |---|---|---|
-| Graph DB | Kùzu (SQLite fallback behind interface) | Kùzu binary size or query p95 fails gate → flip default |
-| Compression lib | Evaluate headroom-ai in M1; in-house if AGPL-incompatible or <40% reduction on our corpus | ADR in M1 |
-| Router classifier | Rules first; local-model classifier only if rules <85% accuracy on the labeled 500-prompt set (`eval/router-set.jsonl`, to be authored in M3) | M3 |
-| Task-map format | repo-map + top-k hybrid | If eval shows pure top-k within 2% tokens, simplify |
-| Flash providers | Top-3 by (price, TTFT, verified cache support) from OpenRouter at M3 time | Health-check failures |
+| Graph store | SQLite via `node:sqlite`, sole implementation | Misses a §4.2 gate → evaluate a *maintained* graph engine, ADR required |
+| Parser runtime | `web-tree-sitter` (WASM) | A language with no prebuilt `.wasm` grammar |
+| Content hash | BLAKE2b (`node:crypto`) | Hashing shows as material in `bench:graph` → `xxhash-wasm` |
+| Default model | `z-ai/glm-5.3-flash` ($0.075/$0.25/M) | A model beats it on **cost per solved task**, not per token |
+| Escalation model | `z-ai/glm-5.3`; evaluate `minimax/minimax-m3` ($0.30/$1.20, 4.7× cheaper) | P4 measurement |
+| Compaction trigger | 60% of window, batched | P2 measurement |
+| Task-map format | repo-map + top-k hybrid | Pure top-k within 2% tokens → simplify |
+| Dev platform | Windows native, no-compile stack | WSL networking fixed (DEVIATION-001) |
 
 ---
 
-## 9. Working conventions for the coding agent
+## 9. Working conventions
 
-- Conventional commits; one logical change per commit; PR-sized branches merged by CI.
-- Any deviation from a numeric gate: do **not** silently lower the gate — open `docs/decisions/DEVIATION-<n>.md` with data and stop the milestone.
-- Vendored eval corpus and lockfiles are immutable inputs; never "fix" a failing benchmark by changing the corpus.
+- Conventional commits, one logical change per commit, gates green before commit.
+- Any deviation from a numeric gate: open `docs/decisions/DEVIATION-<n>.md` with
+  data and stop the phase. Never lower the gate.
+- Vendored eval corpus and lockfiles are immutable inputs. Never fix a failing
+  benchmark by changing the corpus.
+- **Measure before claiming.** No optimization ships without a before/after on a
+  suite that actually exercises it.
 - Prefer deleting code to adding flags. The harness's value is what it leaves out.
 
 ## 10. Environment
 
 ```
-NODREL_TOKEN            # gateway device token (M4+)
-NODREL_GATEWAY_URL      # default https://api.<domain>
-OPENROUTER_API_KEY      # dev/testing + BYOK path
-OLLAMA_HOST             # optional, default http://localhost:11434
-NODREL_TELEMETRY=off|local|aggregate   # default local
+OPENROUTER_API_KEY                    # provider access; required for eval
+NODREL_TOKEN                          # gateway device token (P5+)
+NODREL_GATEWAY_URL                    # default https://api.<domain>
+OLLAMA_HOST                           # optional, default http://localhost:11434
+NODREL_TELEMETRY=off|local|aggregate  # default local
 ```
 
 ## 11. References
 
-pi-mono (badlogic/pi-mono, MIT) · oh-my-pi (can1357/oh-my-pi) · Codebase-Memory arXiv 2603.27277 · Lindenbauer et al. arXiv 2508.21433 · JetBrains "Efficient Context Management" (Dec 2025) · SWE-Pruner arXiv 2601.16746 · RANGER arXiv 2509.25257 · headroom (chopratejas/headroom, Apache-2.0) · Serena (oraios/serena, MIT) · Artificial Analysis model/pricing pages (GLM-5.3-Flash, GLM-5.3, Kimi K3) · companion financial model `finmodel.xlsx`.
+- `earendil-works/pi` (MIT) — harness foundation
+- `can1357/oh-my-pi` (MIT) — LSP operations to port
+- TokenPilot, arXiv 2606.17016 — cache-efficient context management
+- Codebase-Memory, arXiv 2603.27277 — graph retrieval token economics
+- JetBrains, "Efficient Context Management" (Dec 2025) — masking vs summarization
+- Local decision records: `docs/decisions/ADR-001..003`, `DEVIATION-001..002`
