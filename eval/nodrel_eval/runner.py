@@ -35,6 +35,9 @@ class TaskResult:
     cost_usd: float
     wall_ms: int
     cache_hit_rate: float
+    masked_count: int = 0
+    masked_tokens_before: int = 0
+    masked_tokens_after: int = 0
     error: str | None = None
     verify_output: str = ""
 
@@ -54,7 +57,7 @@ def _require_entrypoint() -> None:
         )
 
 
-def run_task(task: Task, model: str, seed: int) -> TaskResult:
+def run_task(task: Task, model: str, seed: int, history: bool = False) -> TaskResult:
     """Runs one task end to end and judges it by its verification command."""
     _require_entrypoint()
 
@@ -76,7 +79,8 @@ def run_task(task: Task, model: str, seed: int) -> TaskResult:
                 model,
                 "--timeout-ms",
                 str(task.timeout_s * 1000),
-            ],
+            ]
+            + (["--history"] if history else []),
             capture_output=True,
             text=True,
             timeout=task.timeout_s + 60,
@@ -109,6 +113,9 @@ def run_task(task: Task, model: str, seed: int) -> TaskResult:
             cost_usd=payload.get("costUsd", 0.0),
             wall_ms=payload.get("wallMs", 0),
             cache_hit_rate=payload.get("cacheHitRate", 0.0),
+            masked_count=payload.get("masked", {}).get("count", 0),
+            masked_tokens_before=payload.get("masked", {}).get("tokensBefore", 0),
+            masked_tokens_after=payload.get("masked", {}).get("tokensAfter", 0),
             error=payload.get("error"),
             verify_output=verify_output,
         )
@@ -124,7 +131,7 @@ def run_task(task: Task, model: str, seed: int) -> TaskResult:
 
 
 def run_suite(
-    tasks: list[Task], model: str, seeds: int = 3, progress=None
+    tasks: list[Task], model: str, seeds: int = 3, progress=None, history: bool = False
 ) -> list[TaskResult]:
     """Runs every task once per seed.
 
@@ -136,7 +143,7 @@ def run_suite(
         for task in tasks:
             if progress:
                 progress(task, seed)
-            results.append(run_task(task, model, seed))
+            results.append(run_task(task, model, seed, history))
     return results
 
 
@@ -174,6 +181,10 @@ def summarize(results: list[TaskResult]) -> dict:
         "cost_per_task": statistics.fmean([r.cost_usd for r in results]),
         "cache_hit_rate": (total_cached / total_input) if total_input else 0.0,
         "mean_turns": statistics.fmean([r.turns for r in results]),
+        "masked_outputs": sum(r.masked_count for r in results),
+        "masked_tokens_saved": sum(
+            r.masked_tokens_before - r.masked_tokens_after for r in results
+        ),
         "failures": [
             {"task_id": r.task_id, "seed": r.seed, "error": r.error}
             for r in results

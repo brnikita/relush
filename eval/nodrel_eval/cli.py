@@ -27,18 +27,19 @@ def _progress(task, seed: int) -> None:
     print(f"  [seed {seed}] {task.id} ...", file=sys.stderr, flush=True)
 
 
-def _run(suite: str | None, model: str, seeds: int) -> dict:
+def _run(suite: str | None, model: str, seeds: int, history: bool = False) -> dict:
     tasks = load_tasks(TASKS_DIR, suite)
     if not tasks:
         raise SystemExit(f"no tasks found for suite {suite!r} under {TASKS_DIR}")
 
     print(f"running {len(tasks)} task(s) x {seeds} seed(s) on {model}", file=sys.stderr)
-    results = run_suite(tasks, model, seeds, progress=_progress)
+    results = run_suite(tasks, model, seeds, progress=_progress, history=history)
 
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "model": model,
         "suite": suite or "all",
+        "history": history,
         "summary": summarize(results),
         "results": result_dicts(results),
     }
@@ -52,6 +53,9 @@ def _print_summary(report: dict) -> None:
     print(f"  cost/task       ${s['cost_per_task']:.5f}")
     print(f"  cache hit       {s['cache_hit_rate']:.1%}")
     print(f"  mean turns      {s['mean_turns']:.1f}")
+    if s.get("masked_outputs"):
+        print(f"  masked          {s['masked_outputs']} outputs, "
+              f"{s['masked_tokens_saved']:,} tokens elided")
     if s.get("failures"):
         print(f"  unsolved        {len(s['failures'])}")
 
@@ -82,17 +86,19 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--suite", default=None)
         p.add_argument("--model", default=DEFAULT_MODEL)
         p.add_argument("--seeds", type=int, default=3 if name == "baseline" else 1)
+        p.add_argument("--history", action="store_true", help="enable the history manager")
 
     p = sub.add_parser("compare")
     p.add_argument("--against", default="m0")
     p.add_argument("--suite", default=None)
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--seeds", type=int, default=3)
+    p.add_argument("--history", action="store_true", help="enable the history manager")
 
     args = parser.parse_args(argv)
 
     try:
-        report = _run(args.suite, args.model, args.seeds)
+        report = _run(args.suite, args.model, args.seeds, args.history)
     except AgentUnavailable as error:
         print(f"cannot run eval: {error}", file=sys.stderr)
         return 2

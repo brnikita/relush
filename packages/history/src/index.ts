@@ -7,7 +7,8 @@
  */
 export type { CacheOptions, ContentId } from "./cache.ts";
 export { ContentCache, hashContent } from "./cache.ts";
-
+export type { HistoryExtension, HistoryExtensionOptions } from "./extension.ts";
+export { createHistoryExtension } from "./extension.ts";
 export type { MaskingOptions } from "./masking.ts";
 export {
   DEFAULT_KEEP_RECENT_TURNS,
@@ -19,5 +20,7 @@ export {
   maskPlaceholder,
   parseMaskPlaceholder,
 } from "./masking.ts";
+export type { BuildPrefixOptions, PinnedPrefix } from "./prefix.ts";
+export { buildPrefix, PrefixDriftError, PrefixGuard, serializeTools } from "./prefix.ts";
 
 export const PACKAGE = "history" as const;

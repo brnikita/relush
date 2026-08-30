@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import { createAgent } from "@nodrel/core";
+import { createHistoryExtension } from "@nodrel/history";
 import type { StepEvent, TelemetryEvent } from "@nodrel/telemetry";
 import { aggregate } from "@nodrel/telemetry";
 
@@ -19,6 +21,14 @@ export interface TaskRunOptions {
   readonly apiKey: string;
   /** Wall-clock cap for the whole task. */
   readonly timeoutMs?: number;
+  /**
+   * Enable the history manager (masking).
+   *
+   * Off by default so the M0 baseline measures an unoptimized harness. The
+   * eval harness flips it on to measure what masking is actually worth, which
+   * only means anything if both sides run the same tasks the same way.
+   */
+  readonly history?: boolean;
 }
 
 export interface TaskRunResult {
@@ -30,6 +40,8 @@ export interface TaskRunResult {
   readonly costUsd: number;
   readonly wallMs: number;
   readonly cacheHitRate: number;
+  /** Tokens elided by masking, and what the placeholders cost instead. */
+  readonly masked: { count: number; tokensBefore: number; tokensAfter: number };
   readonly error?: string;
 }
 
@@ -53,12 +65,28 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
   const started = Date.now();
   const toolCalls: string[] = [];
   const events: TelemetryEvent[] = [];
+  const masked = { count: 0, tokensBefore: 0, tokensAfter: 0 };
+
+  const extensions = options.history
+    ? [
+        createHistoryExtension({
+          cacheRoot: join(options.cwd, ".agent", "cache"),
+          sessionId,
+          onCompaction: (event) => {
+            masked.count += 1;
+            masked.tokensBefore += event.tokensBefore;
+            masked.tokensAfter += event.tokensAfter;
+          },
+        }) as never,
+      ]
+    : [];
 
   const agent = createAgent({
     modelId: options.modelId,
     apiKey: options.apiKey,
     cwd: options.cwd,
     sessionId,
+    extensions,
   });
 
   agent.subscribe((event) => {
@@ -117,6 +145,7 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
     costUsd: totals.costUsd,
     wallMs: Date.now() - started,
     cacheHitRate: totals.cacheHitRate,
+    masked,
     ...(error === undefined ? {} : { error }),
   };
 }
