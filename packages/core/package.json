@@ -21,6 +21,7 @@
     "@earendil-works/pi-ai": "^0.84.4",
     "@nodrel/ai": "workspace:*",
     "@nodrel/context": "workspace:*",
+    "@nodrel/graph": "workspace:*",
     "@nodrel/history": "workspace:*",
     "@nodrel/router": "workspace:*",
     "@nodrel/telemetry": "workspace:*"

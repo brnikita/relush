@@ -18,6 +18,8 @@ export type {
 
 export const PACKAGE = "core" as const;
 
+export type { GraphToolDeps } from "./graph-tool.ts";
+export { createGraphQueryTool } from "./graph-tool.ts";
 export { PINNED_INSTRUCTIONS, SYSTEM_PROMPT } from "./prompt.ts";
 export type { CreateAgentOptions } from "./runtime.ts";
 export { createAgent, ModelNotFoundError, resolveModel } from "./runtime.ts";

@@ -10,6 +10,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import { composeHooks } from "./compose.ts";
 import type { Extension } from "./extensions.ts";
+import { createGraphQueryTool, type GraphToolDeps } from "./graph-tool.ts";
 import { SYSTEM_PROMPT } from "./prompt.ts";
 
 /**
@@ -64,6 +65,13 @@ export interface CreateAgentOptions {
   readonly extensions?: readonly Extension[];
   readonly systemPrompt?: string;
   readonly sessionId?: string;
+  /**
+   * Enables `graph_query` against an indexed store.
+   *
+   * Omitted, the agent runs with the four file/shell tools only -- which is
+   * what the P1 baseline measured, and what any graph comparison is against.
+   */
+  readonly graph?: GraphToolDeps;
 }
 
 export class ModelNotFoundError extends Error {
@@ -98,9 +106,15 @@ export function createAgent(options: CreateAgentOptions): Agent {
   // Tools resolve paths and run commands through this environment, so it is
   // what confines the agent to the working directory.
   const toolContext = { env };
-  const tools = [createReadTool(), createWriteTool(), createEditTool(), createBashTool()].map(
-    (tool) => bindToolContext(tool as never, toolContext),
-  );
+  const tools: unknown[] = [
+    createReadTool(),
+    createWriteTool(),
+    createEditTool(),
+    createBashTool(),
+  ].map((tool) => bindToolContext(tool as never, toolContext));
+
+  // graph_query needs no execution environment: it answers from the index.
+  if (options.graph) tools.push(createGraphQueryTool(options.graph));
 
   return new Agent({
     streamFn: provider.streamSimple.bind(provider) as never,

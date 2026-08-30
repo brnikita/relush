@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { findModel } from "@nodrel/ai";
 import { createAgent, resolveModel } from "@nodrel/core";
+import { indexFiles, resolveCrossFileCalls, SqliteGraphStore } from "@nodrel/graph";
 import { createHistoryExtension } from "@nodrel/history";
 import type { StepEvent, TelemetryEvent } from "@nodrel/telemetry";
 import { aggregate } from "@nodrel/telemetry";
@@ -30,6 +32,13 @@ export interface TaskRunOptions {
    * only means anything if both sides run the same tasks the same way.
    */
   readonly history?: boolean;
+  /**
+   * Index the working directory and expose `graph_query`.
+   *
+   * Off by default so the baseline measures a harness without it, which is what
+   * any comparison has to be against.
+   */
+  readonly graph?: boolean;
 }
 
 export interface TaskRunResult {
@@ -45,7 +54,34 @@ export interface TaskRunResult {
   readonly masked: { count: number; tokensBefore: number; tokensAfter: number };
   /** Compaction modes the session entered, for diagnosing a null result. */
   readonly compactionModes: readonly string[];
+  /** graph_query calls made, and what they cost. */
+  readonly graphQueries: { count: number; tokens: number; results: number };
   readonly error?: string;
+}
+
+/**
+ * Indexes the working directory into an in-memory graph.
+ *
+ * In memory rather than `.agent/graph/`: an eval task runs once in a throwaway
+ * directory, so persistence would only add I/O. A real session persists.
+ */
+async function buildGraph(cwd: string) {
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(path);
+      else files.push(path);
+    }
+  };
+  walk(cwd);
+
+  const store = new SqliteGraphStore({ path: ":memory:" });
+  store.init();
+  await indexFiles(store, cwd, files);
+  resolveCrossFileCalls(store);
+  return store;
 }
 
 /** Usage as pi-ai reports it, which splits cache reads and writes. */
@@ -94,12 +130,27 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
       ]
     : [];
 
+  const graphQueries = { count: 0, tokens: 0, results: 0 };
+  const graph = options.graph ? await buildGraph(options.cwd) : undefined;
+
   const agent = createAgent({
     modelId: options.modelId,
     apiKey: options.apiKey,
     cwd: options.cwd,
     sessionId,
     extensions,
+    ...(graph
+      ? {
+          graph: {
+            store: graph,
+            onQuery: (event) => {
+              graphQueries.count += 1;
+              graphQueries.tokens += event.tokens;
+              graphQueries.results += event.results;
+            },
+          },
+        }
+      : {}),
   });
 
   agent.subscribe((event) => {
@@ -160,6 +211,7 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
     cacheHitRate: totals.cacheHitRate,
     masked,
     compactionModes: [...modes],
+    graphQueries,
     ...(error === undefined ? {} : { error }),
   };
 }

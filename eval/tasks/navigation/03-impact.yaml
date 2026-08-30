@@ -1,0 +1,509 @@
+id: impact-count
+suite: navigation
+timeout_s: 600
+prompt: >-
+  How many functions in this repository call shared()? Write just the number to answer.txt.
+files:
+  src/core.js: |
+    export function shared(v) { return v * 2; }
+  src/mod01.js: |
+    // filler line 0 for module 1
+    // filler line 1 for module 1
+    // filler line 2 for module 1
+    // filler line 3 for module 1
+    // filler line 4 for module 1
+    // filler line 5 for module 1
+    // filler line 6 for module 1
+    // filler line 7 for module 1
+    // filler line 8 for module 1
+    // filler line 9 for module 1
+    // filler line 10 for module 1
+    // filler line 11 for module 1
+    // filler line 12 for module 1
+    // filler line 13 for module 1
+    // filler line 14 for module 1
+    // filler line 15 for module 1
+    // filler line 16 for module 1
+    // filler line 17 for module 1
+    // filler line 18 for module 1
+    // filler line 19 for module 1
+    // filler line 20 for module 1
+    // filler line 21 for module 1
+    // filler line 22 for module 1
+    // filler line 23 for module 1
+    // filler line 24 for module 1
+    // filler line 25 for module 1
+    // filler line 26 for module 1
+    // filler line 27 for module 1
+    // filler line 28 for module 1
+    // filler line 29 for module 1
+    // filler line 30 for module 1
+    // filler line 31 for module 1
+    // filler line 32 for module 1
+    // filler line 33 for module 1
+    // filler line 34 for module 1
+    // filler line 35 for module 1
+    // filler line 36 for module 1
+    // filler line 37 for module 1
+    // filler line 38 for module 1
+    // filler line 39 for module 1
+    // filler line 40 for module 1
+    // filler line 41 for module 1
+    // filler line 42 for module 1
+    // filler line 43 for module 1
+    // filler line 44 for module 1
+    export function compute01(a, b) {
+      return a + b + 1;
+    }
+  src/mod02.js: |
+    // filler line 0 for module 2
+    // filler line 1 for module 2
+    // filler line 2 for module 2
+    // filler line 3 for module 2
+    // filler line 4 for module 2
+    // filler line 5 for module 2
+    // filler line 6 for module 2
+    // filler line 7 for module 2
+    // filler line 8 for module 2
+    // filler line 9 for module 2
+    // filler line 10 for module 2
+    // filler line 11 for module 2
+    // filler line 12 for module 2
+    // filler line 13 for module 2
+    // filler line 14 for module 2
+    // filler line 15 for module 2
+    // filler line 16 for module 2
+    // filler line 17 for module 2
+    // filler line 18 for module 2
+    // filler line 19 for module 2
+    // filler line 20 for module 2
+    // filler line 21 for module 2
+    // filler line 22 for module 2
+    // filler line 23 for module 2
+    // filler line 24 for module 2
+    // filler line 25 for module 2
+    // filler line 26 for module 2
+    // filler line 27 for module 2
+    // filler line 28 for module 2
+    // filler line 29 for module 2
+    // filler line 30 for module 2
+    // filler line 31 for module 2
+    // filler line 32 for module 2
+    // filler line 33 for module 2
+    // filler line 34 for module 2
+    // filler line 35 for module 2
+    // filler line 36 for module 2
+    // filler line 37 for module 2
+    // filler line 38 for module 2
+    // filler line 39 for module 2
+    // filler line 40 for module 2
+    // filler line 41 for module 2
+    // filler line 42 for module 2
+    // filler line 43 for module 2
+    // filler line 44 for module 2
+    export function compute02(a, b) {
+      return a + b + 2;
+    }
+  src/mod03.js: |
+    // filler line 0 for module 3
+    // filler line 1 for module 3
+    // filler line 2 for module 3
+    // filler line 3 for module 3
+    // filler line 4 for module 3
+    // filler line 5 for module 3
+    // filler line 6 for module 3
+    // filler line 7 for module 3
+    // filler line 8 for module 3
+    // filler line 9 for module 3
+    // filler line 10 for module 3
+    // filler line 11 for module 3
+    // filler line 12 for module 3
+    // filler line 13 for module 3
+    // filler line 14 for module 3
+    // filler line 15 for module 3
+    // filler line 16 for module 3
+    // filler line 17 for module 3
+    // filler line 18 for module 3
+    // filler line 19 for module 3
+    // filler line 20 for module 3
+    // filler line 21 for module 3
+    // filler line 22 for module 3
+    // filler line 23 for module 3
+    // filler line 24 for module 3
+    // filler line 25 for module 3
+    // filler line 26 for module 3
+    // filler line 27 for module 3
+    // filler line 28 for module 3
+    // filler line 29 for module 3
+    // filler line 30 for module 3
+    // filler line 31 for module 3
+    // filler line 32 for module 3
+    // filler line 33 for module 3
+    // filler line 34 for module 3
+    // filler line 35 for module 3
+    // filler line 36 for module 3
+    // filler line 37 for module 3
+    // filler line 38 for module 3
+    // filler line 39 for module 3
+    // filler line 40 for module 3
+    // filler line 41 for module 3
+    // filler line 42 for module 3
+    // filler line 43 for module 3
+    // filler line 44 for module 3
+    export function compute03(a, b) {
+      return a + b + 3;
+    }
+  src/mod04.js: |
+    // filler line 0 for module 4
+    // filler line 1 for module 4
+    // filler line 2 for module 4
+    // filler line 3 for module 4
+    // filler line 4 for module 4
+    // filler line 5 for module 4
+    // filler line 6 for module 4
+    // filler line 7 for module 4
+    // filler line 8 for module 4
+    // filler line 9 for module 4
+    // filler line 10 for module 4
+    // filler line 11 for module 4
+    // filler line 12 for module 4
+    // filler line 13 for module 4
+    // filler line 14 for module 4
+    // filler line 15 for module 4
+    // filler line 16 for module 4
+    // filler line 17 for module 4
+    // filler line 18 for module 4
+    // filler line 19 for module 4
+    // filler line 20 for module 4
+    // filler line 21 for module 4
+    // filler line 22 for module 4
+    // filler line 23 for module 4
+    // filler line 24 for module 4
+    // filler line 25 for module 4
+    // filler line 26 for module 4
+    // filler line 27 for module 4
+    // filler line 28 for module 4
+    // filler line 29 for module 4
+    // filler line 30 for module 4
+    // filler line 31 for module 4
+    // filler line 32 for module 4
+    // filler line 33 for module 4
+    // filler line 34 for module 4
+    // filler line 35 for module 4
+    // filler line 36 for module 4
+    // filler line 37 for module 4
+    // filler line 38 for module 4
+    // filler line 39 for module 4
+    // filler line 40 for module 4
+    // filler line 41 for module 4
+    // filler line 42 for module 4
+    // filler line 43 for module 4
+    // filler line 44 for module 4
+    export function compute04(a, b) {
+      return a + b + 4;
+    }
+  src/mod05.js: |
+    // filler line 0 for module 5
+    // filler line 1 for module 5
+    // filler line 2 for module 5
+    // filler line 3 for module 5
+    // filler line 4 for module 5
+    // filler line 5 for module 5
+    // filler line 6 for module 5
+    // filler line 7 for module 5
+    // filler line 8 for module 5
+    // filler line 9 for module 5
+    // filler line 10 for module 5
+    // filler line 11 for module 5
+    // filler line 12 for module 5
+    // filler line 13 for module 5
+    // filler line 14 for module 5
+    // filler line 15 for module 5
+    // filler line 16 for module 5
+    // filler line 17 for module 5
+    // filler line 18 for module 5
+    // filler line 19 for module 5
+    // filler line 20 for module 5
+    // filler line 21 for module 5
+    // filler line 22 for module 5
+    // filler line 23 for module 5
+    // filler line 24 for module 5
+    // filler line 25 for module 5
+    // filler line 26 for module 5
+    // filler line 27 for module 5
+    // filler line 28 for module 5
+    // filler line 29 for module 5
+    // filler line 30 for module 5
+    // filler line 31 for module 5
+    // filler line 32 for module 5
+    // filler line 33 for module 5
+    // filler line 34 for module 5
+    // filler line 35 for module 5
+    // filler line 36 for module 5
+    // filler line 37 for module 5
+    // filler line 38 for module 5
+    // filler line 39 for module 5
+    // filler line 40 for module 5
+    // filler line 41 for module 5
+    // filler line 42 for module 5
+    // filler line 43 for module 5
+    // filler line 44 for module 5
+    export function compute05(a, b) {
+      return a + b + 5;
+    }
+  src/mod06.js: |
+    // filler line 0 for module 6
+    // filler line 1 for module 6
+    // filler line 2 for module 6
+    // filler line 3 for module 6
+    // filler line 4 for module 6
+    // filler line 5 for module 6
+    // filler line 6 for module 6
+    // filler line 7 for module 6
+    // filler line 8 for module 6
+    // filler line 9 for module 6
+    // filler line 10 for module 6
+    // filler line 11 for module 6
+    // filler line 12 for module 6
+    // filler line 13 for module 6
+    // filler line 14 for module 6
+    // filler line 15 for module 6
+    // filler line 16 for module 6
+    // filler line 17 for module 6
+    // filler line 18 for module 6
+    // filler line 19 for module 6
+    // filler line 20 for module 6
+    // filler line 21 for module 6
+    // filler line 22 for module 6
+    // filler line 23 for module 6
+    // filler line 24 for module 6
+    // filler line 25 for module 6
+    // filler line 26 for module 6
+    // filler line 27 for module 6
+    // filler line 28 for module 6
+    // filler line 29 for module 6
+    // filler line 30 for module 6
+    // filler line 31 for module 6
+    // filler line 32 for module 6
+    // filler line 33 for module 6
+    // filler line 34 for module 6
+    // filler line 35 for module 6
+    // filler line 36 for module 6
+    // filler line 37 for module 6
+    // filler line 38 for module 6
+    // filler line 39 for module 6
+    // filler line 40 for module 6
+    // filler line 41 for module 6
+    // filler line 42 for module 6
+    // filler line 43 for module 6
+    // filler line 44 for module 6
+    export function compute06(a, b) {
+      return a + b + 6;
+    }
+  src/mod07.js: |
+    // filler line 0 for module 7
+    // filler line 1 for module 7
+    // filler line 2 for module 7
+    // filler line 3 for module 7
+    // filler line 4 for module 7
+    // filler line 5 for module 7
+    // filler line 6 for module 7
+    // filler line 7 for module 7
+    // filler line 8 for module 7
+    // filler line 9 for module 7
+    // filler line 10 for module 7
+    // filler line 11 for module 7
+    // filler line 12 for module 7
+    // filler line 13 for module 7
+    // filler line 14 for module 7
+    // filler line 15 for module 7
+    // filler line 16 for module 7
+    // filler line 17 for module 7
+    // filler line 18 for module 7
+    // filler line 19 for module 7
+    // filler line 20 for module 7
+    // filler line 21 for module 7
+    // filler line 22 for module 7
+    // filler line 23 for module 7
+    // filler line 24 for module 7
+    // filler line 25 for module 7
+    // filler line 26 for module 7
+    // filler line 27 for module 7
+    // filler line 28 for module 7
+    // filler line 29 for module 7
+    // filler line 30 for module 7
+    // filler line 31 for module 7
+    // filler line 32 for module 7
+    // filler line 33 for module 7
+    // filler line 34 for module 7
+    // filler line 35 for module 7
+    // filler line 36 for module 7
+    // filler line 37 for module 7
+    // filler line 38 for module 7
+    // filler line 39 for module 7
+    // filler line 40 for module 7
+    // filler line 41 for module 7
+    // filler line 42 for module 7
+    // filler line 43 for module 7
+    // filler line 44 for module 7
+    export function compute07(a, b) {
+      return a + b + 7;
+    }
+  src/mod08.js: |
+    // filler line 0 for module 8
+    // filler line 1 for module 8
+    // filler line 2 for module 8
+    // filler line 3 for module 8
+    // filler line 4 for module 8
+    // filler line 5 for module 8
+    // filler line 6 for module 8
+    // filler line 7 for module 8
+    // filler line 8 for module 8
+    // filler line 9 for module 8
+    // filler line 10 for module 8
+    // filler line 11 for module 8
+    // filler line 12 for module 8
+    // filler line 13 for module 8
+    // filler line 14 for module 8
+    // filler line 15 for module 8
+    // filler line 16 for module 8
+    // filler line 17 for module 8
+    // filler line 18 for module 8
+    // filler line 19 for module 8
+    // filler line 20 for module 8
+    // filler line 21 for module 8
+    // filler line 22 for module 8
+    // filler line 23 for module 8
+    // filler line 24 for module 8
+    // filler line 25 for module 8
+    // filler line 26 for module 8
+    // filler line 27 for module 8
+    // filler line 28 for module 8
+    // filler line 29 for module 8
+    // filler line 30 for module 8
+    // filler line 31 for module 8
+    // filler line 32 for module 8
+    // filler line 33 for module 8
+    // filler line 34 for module 8
+    // filler line 35 for module 8
+    // filler line 36 for module 8
+    // filler line 37 for module 8
+    // filler line 38 for module 8
+    // filler line 39 for module 8
+    // filler line 40 for module 8
+    // filler line 41 for module 8
+    // filler line 42 for module 8
+    // filler line 43 for module 8
+    // filler line 44 for module 8
+    export function compute08(a, b) {
+      return a + b + 8;
+    }
+  src/mod09.js: |
+    // filler line 0 for module 9
+    // filler line 1 for module 9
+    // filler line 2 for module 9
+    // filler line 3 for module 9
+    // filler line 4 for module 9
+    // filler line 5 for module 9
+    // filler line 6 for module 9
+    // filler line 7 for module 9
+    // filler line 8 for module 9
+    // filler line 9 for module 9
+    // filler line 10 for module 9
+    // filler line 11 for module 9
+    // filler line 12 for module 9
+    // filler line 13 for module 9
+    // filler line 14 for module 9
+    // filler line 15 for module 9
+    // filler line 16 for module 9
+    // filler line 17 for module 9
+    // filler line 18 for module 9
+    // filler line 19 for module 9
+    // filler line 20 for module 9
+    // filler line 21 for module 9
+    // filler line 22 for module 9
+    // filler line 23 for module 9
+    // filler line 24 for module 9
+    // filler line 25 for module 9
+    // filler line 26 for module 9
+    // filler line 27 for module 9
+    // filler line 28 for module 9
+    // filler line 29 for module 9
+    // filler line 30 for module 9
+    // filler line 31 for module 9
+    // filler line 32 for module 9
+    // filler line 33 for module 9
+    // filler line 34 for module 9
+    // filler line 35 for module 9
+    // filler line 36 for module 9
+    // filler line 37 for module 9
+    // filler line 38 for module 9
+    // filler line 39 for module 9
+    // filler line 40 for module 9
+    // filler line 41 for module 9
+    // filler line 42 for module 9
+    // filler line 43 for module 9
+    // filler line 44 for module 9
+    export function compute09(a, b) {
+      return a + b + 9;
+    }
+  src/mod10.js: |
+    // filler line 0 for module 10
+    // filler line 1 for module 10
+    // filler line 2 for module 10
+    // filler line 3 for module 10
+    // filler line 4 for module 10
+    // filler line 5 for module 10
+    // filler line 6 for module 10
+    // filler line 7 for module 10
+    // filler line 8 for module 10
+    // filler line 9 for module 10
+    // filler line 10 for module 10
+    // filler line 11 for module 10
+    // filler line 12 for module 10
+    // filler line 13 for module 10
+    // filler line 14 for module 10
+    // filler line 15 for module 10
+    // filler line 16 for module 10
+    // filler line 17 for module 10
+    // filler line 18 for module 10
+    // filler line 19 for module 10
+    // filler line 20 for module 10
+    // filler line 21 for module 10
+    // filler line 22 for module 10
+    // filler line 23 for module 10
+    // filler line 24 for module 10
+    // filler line 25 for module 10
+    // filler line 26 for module 10
+    // filler line 27 for module 10
+    // filler line 28 for module 10
+    // filler line 29 for module 10
+    // filler line 30 for module 10
+    // filler line 31 for module 10
+    // filler line 32 for module 10
+    // filler line 33 for module 10
+    // filler line 34 for module 10
+    // filler line 35 for module 10
+    // filler line 36 for module 10
+    // filler line 37 for module 10
+    // filler line 38 for module 10
+    // filler line 39 for module 10
+    // filler line 40 for module 10
+    // filler line 41 for module 10
+    // filler line 42 for module 10
+    // filler line 43 for module 10
+    // filler line 44 for module 10
+    export function compute10(a, b) {
+      return a + b + 10;
+    }
+  src/use1.js: |
+    import { shared } from "./core.js";
+    export function alpha(x) { return shared(x); }
+  src/use2.js: |
+    import { shared } from "./core.js";
+    export function beta(x) { return shared(x); }
+  src/use3.js: |
+    import { shared } from "./core.js";
+    export function gamma(x) { return shared(x); }
+verify: |
+  node -e "const fs=require('fs'); const a=fs.readFileSync('answer.txt','utf8').trim(); if(a!=='3') process.exit(1);"

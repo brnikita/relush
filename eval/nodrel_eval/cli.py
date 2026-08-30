@@ -27,19 +27,24 @@ def _progress(task, seed: int) -> None:
     print(f"  [seed {seed}] {task.id} ...", file=sys.stderr, flush=True)
 
 
-def _run(suite: str | None, model: str, seeds: int, history: bool = False) -> dict:
+def _run(
+    suite: str | None, model: str, seeds: int, history: bool = False, graph: bool = False
+) -> dict:
     tasks = load_tasks(TASKS_DIR, suite)
     if not tasks:
         raise SystemExit(f"no tasks found for suite {suite!r} under {TASKS_DIR}")
 
     print(f"running {len(tasks)} task(s) x {seeds} seed(s) on {model}", file=sys.stderr)
-    results = run_suite(tasks, model, seeds, progress=_progress, history=history)
+    results = run_suite(
+        tasks, model, seeds, progress=_progress, history=history, graph=graph
+    )
 
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "model": model,
         "suite": suite or "all",
         "history": history,
+        "graph": graph,
         "summary": summarize(results),
         "results": result_dicts(results),
     }
@@ -53,6 +58,8 @@ def _print_summary(report: dict) -> None:
     print(f"  cost/task       ${s['cost_per_task']:.5f} +/- ${s.get('cost_per_task_sd', 0):.5f}")
     print(f"  cache hit       {s['cache_hit_rate']:.1%} +/- {s.get('cache_hit_rate_sd', 0):.1%}")
     print(f"  mean turns      {s['mean_turns']:.1f}")
+    if s.get("graph_queries"):
+        print(f"  graph queries   {s['graph_queries']}")
     if s.get("masked_outputs"):
         print(f"  masked          {s['masked_outputs']} outputs, "
               f"{s['masked_tokens_saved']:,} tokens elided")
@@ -91,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--model", default=DEFAULT_MODEL)
         p.add_argument("--seeds", type=int, default=3 if name == "baseline" else 1)
         p.add_argument("--history", action="store_true", help="enable the history manager")
+        p.add_argument("--graph", action="store_true", help="enable graph_query")
 
     p = sub.add_parser("compare")
     p.add_argument("--against", default="m0")
@@ -98,11 +106,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--seeds", type=int, default=3)
     p.add_argument("--history", action="store_true", help="enable the history manager")
+    p.add_argument("--graph", action="store_true", help="enable graph_query")
 
     args = parser.parse_args(argv)
 
     try:
-        report = _run(args.suite, args.model, args.seeds, args.history)
+        report = _run(args.suite, args.model, args.seeds, args.history, args.graph)
     except AgentUnavailable as error:
         print(f"cannot run eval: {error}", file=sys.stderr)
         return 2

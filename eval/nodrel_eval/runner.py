@@ -35,6 +35,8 @@ class TaskResult:
     cost_usd: float
     wall_ms: int
     cache_hit_rate: float
+    graph_queries: int = 0
+    graph_query_tokens: int = 0
     masked_count: int = 0
     masked_tokens_before: int = 0
     masked_tokens_after: int = 0
@@ -57,7 +59,9 @@ def _require_entrypoint() -> None:
         )
 
 
-def run_task(task: Task, model: str, seed: int, history: bool = False) -> TaskResult:
+def run_task(
+    task: Task, model: str, seed: int, history: bool = False, graph: bool = False
+) -> TaskResult:
     """Runs one task end to end and judges it by its verification command."""
     _require_entrypoint()
 
@@ -80,7 +84,8 @@ def run_task(task: Task, model: str, seed: int, history: bool = False) -> TaskRe
                 "--timeout-ms",
                 str(task.timeout_s * 1000),
             ]
-            + (["--history"] if history else []),
+            + (["--history"] if history else [])
+            + (["--graph"] if graph else []),
             capture_output=True,
             text=True,
             timeout=task.timeout_s + 60,
@@ -113,6 +118,8 @@ def run_task(task: Task, model: str, seed: int, history: bool = False) -> TaskRe
             cost_usd=payload.get("costUsd", 0.0),
             wall_ms=payload.get("wallMs", 0),
             cache_hit_rate=payload.get("cacheHitRate", 0.0),
+            graph_queries=payload.get("graphQueries", {}).get("count", 0),
+            graph_query_tokens=payload.get("graphQueries", {}).get("tokens", 0),
             masked_count=payload.get("masked", {}).get("count", 0),
             masked_tokens_before=payload.get("masked", {}).get("tokensBefore", 0),
             masked_tokens_after=payload.get("masked", {}).get("tokensAfter", 0),
@@ -131,7 +138,12 @@ def run_task(task: Task, model: str, seed: int, history: bool = False) -> TaskRe
 
 
 def run_suite(
-    tasks: list[Task], model: str, seeds: int = 3, progress=None, history: bool = False
+    tasks: list[Task],
+    model: str,
+    seeds: int = 3,
+    progress=None,
+    history: bool = False,
+    graph: bool = False,
 ) -> list[TaskResult]:
     """Runs every task once per seed.
 
@@ -143,7 +155,7 @@ def run_suite(
         for task in tasks:
             if progress:
                 progress(task, seed)
-            results.append(run_task(task, model, seed, history))
+            results.append(run_task(task, model, seed, history, graph))
     return results
 
 
@@ -202,6 +214,7 @@ def summarize(results: list[TaskResult]) -> dict:
         "cache_hit_rate": (total_cached / total_input) if total_input else 0.0,
         "cache_hit_rate_sd": sd(per_seed_cache),
         "mean_turns": statistics.fmean([r.turns for r in results]),
+        "graph_queries": sum(r.graph_queries for r in results),
         "masked_outputs": sum(r.masked_count for r in results),
         "masked_tokens_saved": sum(
             r.masked_tokens_before - r.masked_tokens_after for r in results

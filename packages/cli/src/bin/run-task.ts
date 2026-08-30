@@ -15,6 +15,7 @@ interface Args {
   model: string;
   timeoutMs: number;
   history: boolean;
+  graph: boolean;
 }
 
 function parseArgs(argv: readonly string[]): Args {
@@ -27,7 +28,7 @@ function parseArgs(argv: readonly string[]): Args {
   const cwd = get("--cwd");
   if (prompt === undefined || cwd === undefined) {
     throw new Error(
-      "usage: nodrel-run-task --prompt <text> --cwd <dir> [--model <id>] [--timeout-ms <n>] [--history]",
+      "usage: nodrel-run-task --prompt <text> --cwd <dir> [--model <id>] [--timeout-ms <n>] [--history] [--graph]",
     );
   }
 
@@ -37,6 +38,7 @@ function parseArgs(argv: readonly string[]): Args {
     model: get("--model") ?? "z-ai/glm-5.3-flash",
     timeoutMs: Number(get("--timeout-ms") ?? 600_000),
     history: argv.includes("--history"),
+    graph: argv.includes("--graph"),
   };
 }
 
@@ -62,6 +64,7 @@ async function main(): Promise<number> {
     apiKey,
     timeoutMs: args.timeoutMs,
     history: args.history,
+    graph: args.graph,
   });
 
   process.stdout.write(`${JSON.stringify(result)}\n`);

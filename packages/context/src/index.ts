@@ -3,4 +3,10 @@
  * deterministic task map. Every response is token-budgeted and returns
  * compressed signatures, never bodies.
  */
+export type { GraphOperation, GraphQueryRequest, GraphQueryResponse } from "./query.ts";
+export { DEFAULT_BUDGET, fitToBudget, graphQuery, renderNode } from "./query.ts";
+
+export type { GraphToolOptions, ToolResult } from "./tool.ts";
+export { executeGraphQuery } from "./tool.ts";
+
 export const PACKAGE = "context" as const;

@@ -99,6 +99,9 @@ importers:
       '@nodrel/context':
         specifier: workspace:*
         version: link:../context
+      '@nodrel/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@nodrel/history':
         specifier: workspace:*
         version: link:../history
