@@ -22,7 +22,8 @@
     "bench:graph": "node --experimental-strip-types scripts/bench-graph.ts",
     "eval": "uv run --project eval nodrel-eval",
     "eval:baseline": "uv run --project eval nodrel-eval baseline --suite internal --seeds 3",
-    "eval:compare": "uv run --project eval nodrel-eval compare"
+    "eval:compare": "uv run --project eval nodrel-eval compare",
+    "eval:ab": "uv run --project eval nodrel-eval ab"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.5",

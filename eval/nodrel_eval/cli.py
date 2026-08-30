@@ -13,6 +13,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .compare import format_comparison, per_seed, welch
 from .runner import AgentUnavailable, result_dicts, run_suite, summarize
 from .task import load_tasks
 
@@ -88,6 +89,84 @@ def _compare(current: dict, baseline: dict) -> int:
     return 0
 
 
+def _ab(args) -> int:
+    """Runs both configurations back to back and tests the difference.
+
+    Back to back rather than against a stored baseline: provider cache state
+    moves on a timescale of minutes, so comparing against a report from an
+    hour ago measures the clock as much as the change.
+    """
+    tasks = load_tasks(TASKS_DIR, args.suite)
+    if not tasks:
+        raise SystemExit("no tasks for suite %r" % args.suite)
+
+    graph = args.treatment in ("graph", "both")
+    history = args.treatment in ("history", "both")
+
+    log = lambda text: print(text, file=sys.stderr)
+    log("A/B on %d task(s) x %d seed(s), %s" % (len(tasks), args.seeds, args.model))
+    log("  control:   baseline harness")
+    log("  treatment: %s" % args.treatment)
+
+    log("running control...")
+    control = run_suite(tasks, args.model, args.seeds, progress=_progress)
+    log("running treatment...")
+    treatment = run_suite(
+        tasks, args.model, args.seeds, progress=_progress, history=history, graph=graph
+    )
+
+    metrics = [
+        ("tokens/task", "total_tokens", "", True),
+        ("cost/task", "cost_usd", "$", True),
+        ("turns", "turns", "", True),
+        ("wall ms", "wall_ms", "", True),
+    ]
+
+    rule = "=" * 104
+    print("")
+    print(rule)
+    print(
+        "A/B: baseline vs %s  --  %d tasks x %d seeds"
+        % (args.treatment, len(tasks), args.seeds)
+    )
+    print(rule)
+
+    comparisons = []
+    for label, attribute, unit, lower_better in metrics:
+        comparison = welch(label, per_seed(control, attribute), per_seed(treatment, attribute))
+        comparisons.append(comparison)
+        print(format_comparison(comparison, unit, lower_better))
+
+    # Solve rate is the guard: a cheaper run that solves less is not an
+    # improvement, so it is reported whether or not it moved.
+    control_solved = sum(1 for r in control if r.solved) / max(1, len(control))
+    treatment_solved = sum(1 for r in treatment if r.solved) / max(1, len(treatment))
+    changed = "unchanged" if control_solved == treatment_solved else "CHANGED"
+    print("")
+    print(
+        "  solve rate       %21.1f%%  ->  %21.1f%%   (%s)"
+        % (control_solved * 100, treatment_solved * 100, changed)
+    )
+
+    graph_queries = sum(r.graph_queries for r in treatment)
+    if graph_queries:
+        print("  graph queries    %d across the treatment run" % graph_queries)
+    compacted = sum(r.masked_count for r in treatment)
+    if compacted:
+        print("  compacted        %d outputs" % compacted)
+
+    significant = [c for c in comparisons if c.significant]
+    print("")
+    print(
+        "  %d of %d metrics moved outside the noise floor."
+        % (len(significant), len(comparisons))
+    )
+
+    if treatment_solved < control_solved:
+        print("  WARNING: solve rate fell; a cheaper run that solves less is not an improvement.")
+        return 1
+    return 0
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="nodrel-eval")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -100,6 +179,17 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--history", action="store_true", help="enable the history manager")
         p.add_argument("--graph", action="store_true", help="enable graph_query")
 
+    p = sub.add_parser("ab", help="run two configurations and test the difference")
+    p.add_argument("--suite", default=None)
+    p.add_argument("--model", default=DEFAULT_MODEL)
+    p.add_argument("--seeds", type=int, default=3)
+    p.add_argument(
+        "--treatment",
+        default="graph",
+        choices=["graph", "history", "both"],
+        help="what to enable on the treatment side",
+    )
+
     p = sub.add_parser("compare")
     p.add_argument("--against", default="m0")
     p.add_argument("--suite", default=None)
@@ -109,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--graph", action="store_true", help="enable graph_query")
 
     args = parser.parse_args(argv)
+
+    if args.command == "ab":
+        return _ab(args)
 
     try:
         report = _run(args.suite, args.model, args.seeds, args.history, args.graph)
