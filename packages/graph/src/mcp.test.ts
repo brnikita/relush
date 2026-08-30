@@ -90,7 +90,8 @@ describe("MCP protocol", () => {
     );
 
     expect(response?.error).toBeUndefined();
-    expect((response?.result as { isError: boolean }).isError).toBe(true);
+    const result = (response?.result ?? {}) as { isError?: boolean };
+    expect(result.isError).toBe(true);
   });
 
   it("answers ping", () => {
