@@ -527,7 +527,20 @@ rate ≥ 95% of baseline. All differences reported with spread; anything inside
 the noise floor is not an effect.
 Verify: `pnpm bench:graph && pnpm eval:compare --against p1`
 
-### P4 — Router and local runtime
+### P4 — Router and local runtime ⬅ PARTIALLY DONE
+
+Done: rule classifier, failure-driven escalation (two failures up, two greens
+down), impact-size override, layer pinning, per-layer token accounting, and the
+`nodrel` CLI with the full slash-command set.
+
+Not done: Ollama adapter and hardware detection, provider health checks, the
+labelled 500-prompt classifier set. The local-share KPI is not claimable on this
+machine regardless (§4.6, DEVIATION-003).
+
+Verified end to end: `nodrel --print` on a failing test read the source, ran the
+test, fixed the bug and re-ran to confirm — the workflow the product exists for.
+
+### P4 — original scope
 
 Tasks: rule classifier plus a labelled 500-prompt set; layer config with health
 checks; escalation state machine; budget accounting; Ollama adapter and hardware
