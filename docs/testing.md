@@ -39,3 +39,26 @@ TypeScript settings this project deliberately uses: with
 `noUncheckedIndexedAccess` and index-signature types such as `process.env`,
 bracket access is what the compiler requires, so the rule would fight `tsc` on
 every access. No other recommended rule is disabled.
+
+## Measurement discipline
+
+Three rules, each learned by breaking it.
+
+**Never rebuild during a measurement.** The eval harness spawns a fresh `node`
+per task, so a `pnpm build` mid-run silently changes the code under test between
+one task and the next. This was nearly done during the P3 A/B; it survived only
+because the commits landing mid-run touched tests and re-exports rather than the
+agent's runtime path, which was luck rather than method. Check
+`git log --since=<run start>` against `packages/*/src/*.ts` before trusting any
+comparison that spanned a commit.
+
+**Run both sides back to back.** Provider cache state moves on a timescale of
+minutes, so comparing a fresh run against a stored baseline measures the clock
+as much as the change. `eval:ab` runs control and treatment in one process for
+this reason.
+
+**Report the spread, and respect it.** Identical configurations measured 26%
+apart on cost at two tasks and one seed. A difference smaller than the pooled
+spread is not an effect, and `eval:ab` labels it as such via Welch's t-test on
+per-seed means. This project has already withdrawn one published figure for
+violating this (DEVIATION-002).
