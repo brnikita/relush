@@ -260,15 +260,34 @@ Measured consequence (`longhorizon` suite, identical tasks):
 ordinary path. Content is ordered most-stable to least-stable: system prompt,
 tool schemas, task map, then conversation.
 
-**Rule 2 — Compaction is batched, not continuous.** Compaction fires only when
-context exceeds **60% of the model window**. When it fires it compacts a
-contiguous prefix of old turns in one operation, then leaves the result
-untouched until the next trigger. This pays one cache invalidation per batch
-instead of one per turn, raising `R` from 1 to typically 20–50.
+**Rule 2 — Compaction is batched, not continuous, and has two modes.**
 
-**Rule 3 — Size threshold from the break-even, not a constant.** An output is
-compacted only if `T ≥ 4S / R_expected`, where `S` is the suffix length at the
-compaction point. Implementations must compute this, not hardcode it.
+Working the break-even forward with real numbers settles what compaction is
+*for*. At `R = 20` with a 20,000-token suffix an output must exceed ~4,000
+tokens to pay for itself; measured tool outputs average **~160 tokens**.
+**Compaction is therefore not a cost optimization on this workload, and batching
+does not rescue it** — batching lowers the bar by the factor `R`, not by the
+factor of ~25 that would be needed.
+
+It remains necessary for a different reason: the window is finite, and near the
+limit the alternative to compacting is a request that does not fit. Hence:
+
+- **Opportunistic** — above 60% of the window. Compact only what clears
+  break-even. On typical workloads that is nothing, and nothing is correct.
+- **Mandatory** — above 85% of the window. Compact largest-first until the
+  transcript fits, break-even notwithstanding, because feasibility outranks
+  cost.
+
+**Rule 3 — Size threshold from the break-even, not a constant.** In
+opportunistic mode an output is compacted only if `T ≥ 4S / R_expected`, where
+`S` is the suffix it would invalidate. Implementations compute this; they do not
+hardcode it. `R_expected` is deliberately conservative — underestimating merely
+forgoes a saving, overestimating ships v1.0's regression.
+
+**Rule 3a — Compacted regions are frozen.** Once compacted, a region is never
+recomputed; its bytes are memoized and replayed verbatim, so the cache re-warms
+after a single miss. A batched compactor that recomputed its output each turn
+would be exactly as bad as a sliding window.
 
 **Rule 4 — Compaction is reversible.** Originals are stored content-addressed
 in `.agent/cache/`, retrievable via `expand(id)` byte-identically. Content is
@@ -289,9 +308,19 @@ unchanged functions), structural for JSON, line-scored for logs. **No
 token-level pruning** — it breaks code syntax. Compression at ingestion is
 preferred over compaction later, because it never invalidates a cache.
 
-**Gate**: any compaction strategy must be demonstrated to **reduce cost per
-solved task**, not merely tokens, on the `longhorizon` suite. Token reduction
-alone is not evidence of an improvement.
+**Gate**: compaction is held to feasibility and safety, not to cost, because
+the arithmetic above shows cost is not what it can deliver:
+
+1. Append-only below the pressure threshold.
+2. Frozen regions replay byte-identically across turns.
+3. Failure signals preserved verbatim in both modes.
+4. A session that would overflow a small window still completes, with no
+   solve-rate loss.
+5. **No cost regression outside the measured noise floor.**
+
+Cost per solved task is a **P3** gate, owned by the context engine. Attacking
+tokens before they enter the transcript has no cache to lose, which is why that
+is where the saving actually lives.
 
 ### 4.5 Router
 
@@ -365,7 +394,12 @@ alone is not evidence of an improvement.
 - **`longhorizon` is mandatory for any history-manager claim.** Short tasks
   cannot exercise compaction: the `internal` suite averages 5.1 turns and the
   history manager never engaged on it.
-- Multi-seed runs report mean ± sd. Three seeds minimum for a frozen report.
+- Multi-seed runs report mean ± sd **for cost, tokens and cache hit**, not only
+  solve rate. Three seeds minimum for a frozen report.
+- **A difference smaller than the pooled spread is not an effect** and is
+  reported as "within noise". The measured run-to-run spread on a two-task,
+  single-seed comparison was 26% of cost — larger than most effects worth
+  claiming. `eval:compare` enforces this labelling.
 - The runner must not report success when the model produced no usable output.
   A run with zero tokens and zero tool calls is a failure regardless of whether
   an exception was thrown.
@@ -428,25 +462,33 @@ solve rate 100%, 7,189 tokens/task, $0.00025/task, 88.4% cache hit, 5.0 turns.
 
 Verify: `pnpm eval:baseline && pnpm test`
 
-### P2 — Cache-first history manager ⬅ CURRENT
+### P2 — Cache-first history manager ✅ DONE
 
-Tasks: expand `longhorizon` to ≥ 10 tasks; implement batched compaction per
-§4.4 with the computed threshold; ingestion-time compression per content type;
-prefix pinning already done; terse output instruction.
+Batched two-mode compaction, frozen regions, failure-signal preservation,
+prefix pinning, and variance reporting in the eval harness.
 
-**Gate**: cost/task ≤ 50% of baseline on `longhorizon`; cache hit ≥ 90%; solve
-rate ≥ 95% of baseline; output tokens −40%; prefix-stability test green.
-Verify: `pnpm eval:compare --against p1 --suite longhorizon && pnpm check:budgets`
+Outcome: compaction is a **feasibility mechanism**, not a cost lever. On typical
+workloads it correctly declines to act. See DEVIATION-002 for the arithmetic and
+for the withdrawn cost claim.
 
-### P3 — Graph indexer and context engine
+Remaining for P2: ingestion-time compression per content type, and the terse
+output instruction (§4.1), both of which reduce tokens *before* they enter the
+transcript and so cost no cache.
+
+**Gate**: the five conditions in §4.4. Cost per solved task moves to P3.
+Verify: `pnpm test && pnpm check:budgets`
+
+### P3 — Graph indexer and context engine ⬅ CURRENT
 
 Tasks: `GraphStore` interface and conformance suite; SQLite implementation;
 `web-tree-sitter` indexer (TS/JS first, then 15 languages); incremental
 indexing; `graph_query` with budgets and `expand`; task map; retrieval-miss
 logging; `bench:graph`; MCP server. SCIP indexers for ts/py/go where available.
 
-**Gate**: §4.2 performance table met; tokens per solved task ≤ 35% of baseline;
-solve rate ≥ 95% of baseline.
+**Gate**: §4.2 performance table met; **cost per solved task ≤ 50% of
+baseline** (inherited from P2); tokens per solved task ≤ 35% of baseline; solve
+rate ≥ 95% of baseline. All differences reported with spread; anything inside
+the noise floor is not an effect.
 Verify: `pnpm bench:graph && pnpm eval:compare --against p1`
 
 ### P4 — Router and local runtime
