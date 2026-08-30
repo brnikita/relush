@@ -20,6 +20,12 @@ importers:
       '@nodrel/graph':
         specifier: workspace:*
         version: link:packages/graph
+      '@nodrel/history':
+        specifier: workspace:*
+        version: link:packages/history
+      '@nodrel/router':
+        specifier: workspace:*
+        version: link:packages/router
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.3.5

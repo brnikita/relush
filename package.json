@@ -37,6 +37,8 @@
     "@nodrel/ai": "workspace:*",
     "@nodrel/context": "workspace:*",
     "@nodrel/core": "workspace:*",
-    "@nodrel/graph": "workspace:*"
+    "@nodrel/graph": "workspace:*",
+    "@nodrel/history": "workspace:*",
+    "@nodrel/router": "workspace:*"
   }
 }
