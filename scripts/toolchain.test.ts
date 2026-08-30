@@ -7,12 +7,21 @@ import { describe, expect, it } from "vitest";
  * under deadline pressure, so they are asserted rather than trusted.
  */
 
-const readJson = (p: string): Record<string, unknown> =>
-  JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), "utf8"));
+/**
+ * tsconfig files are JSONC, so line comments are stripped before parsing.
+ * String literals are preserved, or a `//` inside a path would truncate the file.
+ */
+const readJsonc = (p: string): Record<string, unknown> => {
+  const raw = readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+  const stripped = raw.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*/g, (m) =>
+    m.startsWith('"') ? m : "",
+  );
+  return JSON.parse(stripped);
+};
 
 describe("toolchain invariants", () => {
   it("keeps TypeScript strict mode and its companions on (SPEC §0.5)", () => {
-    const base = readJson("tsconfig.base.json");
+    const base = readJsonc("tsconfig.base.json");
     const opts = base["compilerOptions"] as Record<string, unknown>;
 
     expect(opts["strict"]).toBe(true);
@@ -24,7 +33,7 @@ describe("toolchain invariants", () => {
   });
 
   it("targets a Node version the spec supports (SPEC §0.5: Node >= 22)", () => {
-    const pkg = readJson("package.json");
+    const pkg = readJsonc("package.json");
     const engines = pkg["engines"] as Record<string, string>;
     const major = Number(/(\d+)/.exec(engines["node"] ?? "")?.[1]);
 
@@ -33,7 +42,7 @@ describe("toolchain invariants", () => {
   });
 
   it("still defines the budget check script (SPEC §0.7: never disabled)", () => {
-    const pkg = readJson("package.json");
+    const pkg = readJsonc("package.json");
     const scripts = pkg["scripts"] as Record<string, string>;
 
     expect(scripts["check:budgets"]).toBeTruthy();

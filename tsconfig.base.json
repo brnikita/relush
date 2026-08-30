@@ -15,6 +15,11 @@
     "noImplicitReturns": true,
     "verbatimModuleSyntax": true,
 
+    // Source imports carry .ts extensions (matching upstream Pi); the compiler
+    // rewrites them to .js on emit.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

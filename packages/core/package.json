@@ -17,6 +17,8 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "^0.84.4",
+    "@earendil-works/pi-ai": "^0.84.4",
     "@nodrel/ai": "workspace:*",
     "@nodrel/context": "workspace:*",
     "@nodrel/history": "workspace:*",
