@@ -14,6 +14,21 @@ export {
   findModel,
   RESERVE_ESCALATION,
 } from "./models.ts";
+export type {
+  ChatMessage,
+  ClientOptions,
+  CompletionRequest,
+  CompletionResult,
+  ToolCall,
+  ToolDefinition,
+} from "./openrouter.ts";
+export {
+  ChainExhaustedError,
+  OpenRouterClient,
+  ProviderError,
+  toTokenUsage,
+  wasTruncatedBeforeAnswering,
+} from "./openrouter.ts";
 export type { CountableMessage } from "./tokenize.ts";
 export {
   countTextTokens,

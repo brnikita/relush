@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.84.4",
+    "@nodrel/core": "workspace:*",
     "@nodrel/telemetry": "workspace:*",
     "gpt-tokenizer": "^4.0.0"
   }

@@ -39,6 +39,9 @@ importers:
       '@earendil-works/pi-ai':
         specifier: ^0.84.4
         version: 0.84.4(ws@8.21.3)
+      '@nodrel/core':
+        specifier: workspace:*
+        version: link:../core
       '@nodrel/telemetry':
         specifier: workspace:*
         version: link:../telemetry
