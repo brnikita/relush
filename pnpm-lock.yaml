@@ -11,9 +11,15 @@ importers:
       '@nodrel/ai':
         specifier: workspace:*
         version: link:packages/ai
+      '@nodrel/context':
+        specifier: workspace:*
+        version: link:packages/context
       '@nodrel/core':
         specifier: workspace:*
         version: link:packages/core
+      '@nodrel/graph':
+        specifier: workspace:*
+        version: link:packages/graph
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.3.5

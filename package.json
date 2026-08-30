@@ -19,6 +19,7 @@
     "test:live": "vitest --run --config vitest.live.config.ts",
     "check:budgets": "node --experimental-strip-types scripts/check-budgets.ts",
     "bench:smoke": "node --experimental-strip-types scripts/bench-smoke.ts",
+    "bench:graph": "node --experimental-strip-types scripts/bench-graph.ts",
     "eval": "uv run --project eval nodrel-eval",
     "eval:baseline": "uv run --project eval nodrel-eval baseline --suite internal --seeds 3",
     "eval:compare": "uv run --project eval nodrel-eval compare"
@@ -33,6 +34,8 @@
   },
   "dependencies": {
     "@nodrel/ai": "workspace:*",
-    "@nodrel/core": "workspace:*"
+    "@nodrel/context": "workspace:*",
+    "@nodrel/core": "workspace:*",
+    "@nodrel/graph": "workspace:*"
   }
 }
