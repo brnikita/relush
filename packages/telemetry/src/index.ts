@@ -5,6 +5,17 @@
  * our addition is the per-step token/cost/latency record the router and
  * `/cost` depend on.
  */
+
+export type { LayerTotals, Totals } from "./aggregate.ts";
+export {
+  aggregate,
+  ESCALATION_SHARE_LIMIT,
+  forSession,
+  isStep,
+  since,
+  weekAgo,
+  withinEscalationLimit,
+} from "./aggregate.ts";
 export type {
   CompactionEvent,
   Layer,

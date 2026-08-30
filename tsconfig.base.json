@@ -25,6 +25,10 @@
     "sourceMap": true,
     "composite": true,
     "incremental": true,
+    // Keep the buildinfo with the outputs it describes. Left at the project
+    // root it survives a `rm -rf dist`, and tsc then reports the project up to
+    // date while its declarations are gone -- dependents fail to resolve it.
+    "tsBuildInfoFile": "${configDir}/dist/tsconfig.tsbuildinfo",
 
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
