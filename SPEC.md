@@ -33,12 +33,20 @@ invalidated six of its assumptions.
 | Fork `badlogic/pi-mono`, 4 packages | Repo is `earendil-works/pi`, 10 scoped packages, npm workspaces | Verified 2026-08-30 |
 | Kùzu is the default graph DB | **Kùzu was acquired by Apple (Oct 2025) and archived**; npm package deprecated | Repo `archived: true`, last release v0.11.3 |
 | XXH3 for content hashing | BLAKE2b in `node:crypto` is fast enough by 700× margin | 84 ms / 50 MB vs a 60 s budget |
-| Masking is a free win | **Masking as specified costs 14.9% more than not masking** | Measured, DEVIATION-002 |
+| Masking is a free win | **Masking as specified is a design error**: its threshold was 3 orders of magnitude below break-even | Arithmetic, DEVIATION-002 |
+| — | **Two tasks × one seed cannot measure a 10% effect**: identical runs vary 26% in cost | Measured; a claim was withdrawn over this |
 | Cheapest model per token wins | `ling-3.0-flash` is 3.6× cheaper and solves **nothing** in 200 s | Measured |
 | tree-sitter native bindings | `web-tree-sitter` (WASM) removes the last native dependency | Verified parsing |
 
 The masking result is the significant one. It is not a bug in the
 implementation; it is a flaw in v1.0's design, and §4.4 is rewritten around it.
+
+The measurement result is the humbling one. An earlier revision of this document
+cited a 14.9% cost regression from masking. That figure came from a single-seed
+comparison whose run-to-run noise is 26%, and it has been **withdrawn**. The
+design conclusion stands because it rests on arithmetic rather than on that
+measurement, but §9's methodology rules exist because this project has already
+made the mistake once.
 
 ---
 
