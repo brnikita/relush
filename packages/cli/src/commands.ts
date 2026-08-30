@@ -160,6 +160,23 @@ export const COMMANDS: readonly Command[] = [
   },
 
   {
+    name: "compact",
+    summary: "Force a compaction pass",
+    usage: "/compact",
+    run: (_args, { session }) => ({ output: session.compactNow() }),
+  },
+
+  {
+    name: "clear",
+    summary: "Start a fresh conversation, keeping the index",
+    usage: "/clear",
+    run: (_args, { session }) => {
+      session.clear();
+      return { output: "conversation cleared; the index is kept" };
+    },
+  },
+
+  {
     name: "help",
     summary: "List commands",
     usage: "/help",

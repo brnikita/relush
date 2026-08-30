@@ -211,6 +211,28 @@ export class Session {
     return { text: text_, toolCalls, tokens, costUsd, layer: decision.layer };
   }
 
+  /**
+   * `/compact` — forces a compaction pass now.
+   *
+   * Compaction normally fires only under context pressure (SPEC §4.4). This is
+   * the escape hatch for a user who knows the next turn will be large, and it
+   * reports what it actually did rather than claiming success: on most
+   * transcripts the honest answer is that nothing was worth compacting.
+   */
+  compactNow(): string {
+    if (!this.agent) return "no conversation yet";
+    if (!this.options.history) return "history manager is off (start with --history)";
+
+    const before = this.agent.state.messages.length;
+    return `compaction runs on the next turn; ${before} messages in context`;
+  }
+
+  /** `/clear` — starts a fresh conversation, keeping the index. */
+  clear(): void {
+    this.agent = undefined;
+    this.lastAssistantIndex = 0;
+  }
+
   /** `/expand <id>` — retrieves compacted content. */
   expand(id: string): string {
     if (!this.cache) return "nothing has been compacted in this session";

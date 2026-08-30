@@ -161,3 +161,16 @@ describe("/expand", () => {
     expect((await run("/expand deadbeef")).output).toMatch(/nothing has been compacted|no cached/);
   });
 });
+
+describe("/compact and /clear", () => {
+  it("says the history manager is off rather than pretending to compact", async () => {
+    // This session runs without --history; claiming success would be a lie the
+    // user could not check.
+    expect((await run("/compact")).output).toMatch(/history manager is off|no conversation/);
+  });
+
+  it("clears the conversation and says the index survives", async () => {
+    expect((await run("/clear")).output).toMatch(/cleared/);
+    expect((await run("/graph formatMoney")).output).toContain("formatMoney");
+  });
+});
