@@ -269,7 +269,7 @@ export class BatchedCompactor {
       const message = messages[i];
       suffix -= sizes[i] ?? 0;
 
-      if (!message || message.role !== "toolResult") continue;
+      if (message?.role !== "toolResult") continue;
       if (this.frozen.has(i)) continue;
 
       const text = textOf(message.content);

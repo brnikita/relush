@@ -114,6 +114,19 @@ importers:
       '@nodrel/telemetry':
         specifier: workspace:*
         version: link:../telemetry
+      tree-sitter-javascript:
+        specifier: ^0.25.0
+        version: 0.25.0
+      tree-sitter-typescript:
+        specifier: ^0.23.2
+        version: 0.23.2
+      web-tree-sitter:
+        specifier: ^0.27.0
+        version: 0.27.0
+    devDependencies:
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(yaml@2.9.0))
 
   packages/history:
     dependencies:
@@ -769,6 +782,10 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  node-addon-api@8.9.2:
+    resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
+    engines: {node: ^18 || ^20 || >= 21}
+
   node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
@@ -777,6 +794,10 @@ packages:
   node-fetch@3.3.2:
     resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
+  node-gyp-build@4.8.4:
+    resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
+    hasBin: true
 
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
@@ -857,6 +878,30 @@ packages:
   tinyrainbow@3.1.1:
     resolution: {integrity: sha512-yau8yJdTt989Mm0Bd/236QnzEiPf2xLLTqUZRUJOo/3CB078LSwzei343DgtJVmfJKJE3TMINY1u42SQsP6mXw==}
     engines: {node: '>=14.0.0'}
+
+  tree-sitter-javascript@0.23.1:
+    resolution: {integrity: sha512-/bnhbrTD9frUYHQTiYnPcxyHORIw157ERBa6dqzaKxvR/x3PC4Yzd+D1pZIMS6zNg2v3a8BZ0oK7jHqsQo9fWA==}
+    peerDependencies:
+      tree-sitter: ^0.21.1
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
+
+  tree-sitter-javascript@0.25.0:
+    resolution: {integrity: sha512-1fCbmzAskZkxcZzN41sFZ2br2iqTYP3tKls1b/HKGNPQUVOpsUxpmGxdN/wMqAk3jYZnYBR1dd/y/0avMeU7dw==}
+    peerDependencies:
+      tree-sitter: ^0.25.0
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
+
+  tree-sitter-typescript@0.23.2:
+    resolution: {integrity: sha512-e04JUUKxTT53/x3Uq1zIL45DoYKVfHH4CZqwgZhPg5qYROl5nQjV+85ruFzFGZxu+QeFVbRTPDRnqL9UbU4VeA==}
+    peerDependencies:
+      tree-sitter: ^0.21.0
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
 
   ts-algebra@2.0.0:
     resolution: {integrity: sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==}
@@ -962,6 +1007,9 @@ packages:
   web-streams-polyfill@3.3.3:
     resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
     engines: {node: '>= 8'}
+
+  web-tree-sitter@0.27.0:
+    resolution: {integrity: sha512-XK08gj6RwTMQatAG7uVRP8MunqotL/XC19vHgkSPKmELgbGPBj4ECvB8haHOUnyj6ls2B8t42UTro14zxGgAHg==}
 
   why-is-node-running@2.3.0:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
@@ -1655,6 +1703,8 @@ snapshots:
 
   nanoid@3.3.18: {}
 
+  node-addon-api@8.9.2: {}
+
   node-domexception@1.0.0: {}
 
   node-fetch@3.3.2:
@@ -1662,6 +1712,8 @@ snapshots:
       data-uri-to-buffer: 4.0.1
       fetch-blob: 3.2.0
       formdata-polyfill: 4.0.10
+
+  node-gyp-build@4.8.4: {}
 
   obug@2.1.4: {}
 
@@ -1746,6 +1798,22 @@ snapshots:
 
   tinyrainbow@3.1.1: {}
 
+  tree-sitter-javascript@0.23.1:
+    dependencies:
+      node-addon-api: 8.9.2
+      node-gyp-build: 4.8.4
+
+  tree-sitter-javascript@0.25.0:
+    dependencies:
+      node-addon-api: 8.9.2
+      node-gyp-build: 4.8.4
+
+  tree-sitter-typescript@0.23.2:
+    dependencies:
+      node-addon-api: 8.9.2
+      node-gyp-build: 4.8.4
+      tree-sitter-javascript: 0.23.1
+
   ts-algebra@2.0.0: {}
 
   tslib@2.8.1: {}
@@ -1796,6 +1864,8 @@ snapshots:
       - msw
 
   web-streams-polyfill@3.3.3: {}
+
+  web-tree-sitter@0.27.0: {}
 
   why-is-node-running@2.3.0:
     dependencies:
