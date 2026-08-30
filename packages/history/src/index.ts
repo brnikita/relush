@@ -8,4 +8,16 @@
 export type { CacheOptions, ContentId } from "./cache.ts";
 export { ContentCache, hashContent } from "./cache.ts";
 
+export type { MaskingOptions } from "./masking.ts";
+export {
+  DEFAULT_KEEP_RECENT_TURNS,
+  DEFAULT_MIN_TOKENS_TO_MASK,
+  ExpandError,
+  expand,
+  isMasked,
+  maskOldOutputs,
+  maskPlaceholder,
+  parseMaskPlaceholder,
+} from "./masking.ts";
+
 export const PACKAGE = "history" as const;
