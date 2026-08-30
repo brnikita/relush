@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { createAgent } from "@nodrel/core";
+import { findModel } from "@nodrel/ai";
+import { createAgent, resolveModel } from "@nodrel/core";
 import { createHistoryExtension } from "@nodrel/history";
 import type { StepEvent, TelemetryEvent } from "@nodrel/telemetry";
 import { aggregate } from "@nodrel/telemetry";
@@ -40,8 +41,10 @@ export interface TaskRunResult {
   readonly costUsd: number;
   readonly wallMs: number;
   readonly cacheHitRate: number;
-  /** Tokens elided by masking, and what the placeholders cost instead. */
+  /** Outputs compacted, and what the placeholders cost instead. */
   readonly masked: { count: number; tokensBefore: number; tokensAfter: number };
+  /** Compaction modes the session entered, for diagnosing a null result. */
+  readonly compactionModes: readonly string[];
   readonly error?: string;
 }
 
@@ -66,17 +69,27 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
   const toolCalls: string[] = [];
   const events: TelemetryEvent[] = [];
   const masked = { count: 0, tokensBefore: 0, tokensAfter: 0 };
+  const modes = new Set<string>();
+
+  // Compaction thresholds are relative to the model's context window, so the
+  // window has to come from the model rather than a constant.
+  const windowTokens =
+    findModel(options.modelId)?.contextLength ??
+    (resolveModel(options.modelId) as { contextWindow?: number }).contextWindow ??
+    128_000;
 
   const extensions = options.history
     ? [
         createHistoryExtension({
           cacheRoot: join(options.cwd, ".agent", "cache"),
+          windowTokens,
           sessionId,
           onCompaction: (event) => {
             masked.count += 1;
             masked.tokensBefore += event.tokensBefore;
             masked.tokensAfter += event.tokensAfter;
           },
+          onDecision: (decision) => modes.add(decision.mode),
         }) as never,
       ]
     : [];
@@ -146,6 +159,7 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
     wallMs: Date.now() - started,
     cacheHitRate: totals.cacheHitRate,
     masked,
+    compactionModes: [...modes],
     ...(error === undefined ? {} : { error }),
   };
 }

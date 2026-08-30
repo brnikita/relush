@@ -167,6 +167,24 @@ def summarize(results: list[TaskResult]) -> dict:
     total_input = sum(r.input_tokens + r.cached_tokens for r in results)
     total_cached = sum(r.cached_tokens for r in results)
 
+    # Per-seed aggregates, so cost and token spread can be reported alongside
+    # the mean. Reporting a mean without a spread is how a run-to-run swing of
+    # +/-26% gets mistaken for a real effect -- which happened here once.
+    per_seed_cost = [
+        statistics.fmean([r.cost_usd for r in rs]) for rs in by_seed.values() if rs
+    ]
+    per_seed_tokens = [
+        statistics.fmean([r.total_tokens for r in rs]) for rs in by_seed.values() if rs
+    ]
+    per_seed_cache = []
+    for rs in by_seed.values():
+        seed_input = sum(r.input_tokens + r.cached_tokens for r in rs)
+        seed_cached = sum(r.cached_tokens for r in rs)
+        per_seed_cache.append((seed_cached / seed_input) if seed_input else 0.0)
+
+    def sd(xs: list[float]) -> float:
+        return statistics.stdev(xs) if len(xs) > 1 else 0.0
+
     return {
         "tasks": len({r.task_id for r in results}),
         "runs": len(results),
@@ -178,8 +196,11 @@ def summarize(results: list[TaskResult]) -> dict:
             statistics.stdev(per_seed_solve) if len(per_seed_solve) > 1 else 0.0
         ),
         "tokens_per_task": statistics.fmean([r.total_tokens for r in results]),
+        "tokens_per_task_sd": sd(per_seed_tokens),
         "cost_per_task": statistics.fmean([r.cost_usd for r in results]),
+        "cost_per_task_sd": sd(per_seed_cost),
         "cache_hit_rate": (total_cached / total_input) if total_input else 0.0,
+        "cache_hit_rate_sd": sd(per_seed_cache),
         "mean_turns": statistics.fmean([r.turns for r in results]),
         "masked_outputs": sum(r.masked_count for r in results),
         "masked_tokens_saved": sum(

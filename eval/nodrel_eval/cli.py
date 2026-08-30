@@ -49,9 +49,9 @@ def _print_summary(report: dict) -> None:
     s = report["summary"]
     print(f"\n{report['suite']} on {report['model']}")
     print(f"  solve rate      {s['solve_rate']:.1%} +/- {s['solve_rate_sd']:.1%}")
-    print(f"  tokens/task     {s['tokens_per_task']:,.0f}")
-    print(f"  cost/task       ${s['cost_per_task']:.5f}")
-    print(f"  cache hit       {s['cache_hit_rate']:.1%}")
+    print(f"  tokens/task     {s['tokens_per_task']:,.0f} +/- {s.get('tokens_per_task_sd', 0):,.0f}")
+    print(f"  cost/task       ${s['cost_per_task']:.5f} +/- ${s.get('cost_per_task_sd', 0):.5f}")
+    print(f"  cache hit       {s['cache_hit_rate']:.1%} +/- {s.get('cache_hit_rate_sd', 0):.1%}")
     print(f"  mean turns      {s['mean_turns']:.1f}")
     if s.get("masked_outputs"):
         print(f"  masked          {s['masked_outputs']} outputs, "
@@ -71,8 +71,12 @@ def _compare(current: dict, baseline: dict) -> int:
     print(f"  solve rate   {b['solve_rate']:.1%} -> {c['solve_rate']:.1%}"
           f"  ({ratio(c['solve_rate'], b['solve_rate']):.0%} of baseline)")
     print(f"  tokens/task  {b['tokens_per_task']:,.0f} -> {c['tokens_per_task']:,.0f}"
-          f"  ({ratio(c['tokens_per_task'], b['tokens_per_task']):.0%} of baseline)")
-    print(f"  cost/task    ${b['cost_per_task']:.5f} -> ${c['cost_per_task']:.5f}")
+          f"  ({ratio(c['tokens_per_task'], b['tokens_per_task']):.0%} of baseline)"
+          + verdict(c["tokens_per_task"], b["tokens_per_task"],
+                    c.get("tokens_per_task_sd", 0.0), b.get("tokens_per_task_sd", 0.0)))
+    print(f"  cost/task    ${b['cost_per_task']:.5f} -> ${c['cost_per_task']:.5f}"
+          + verdict(c["cost_per_task"], b["cost_per_task"],
+                    c.get("cost_per_task_sd", 0.0), b.get("cost_per_task_sd", 0.0)))
     print(f"  cache hit    {b['cache_hit_rate']:.1%} -> {c['cache_hit_rate']:.1%}")
     return 0
 
