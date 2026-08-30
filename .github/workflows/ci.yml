@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref; a stale result helps nobody.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        # No API key: unit tests run against a mocked provider. Live-model
+        # tests (*.live.test.ts) are excluded by vitest config, because the
+        # free-tier pool 429s unpredictably and CI must not depend on it.
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Token budgets (SPEC §4.1 — never disable, per §0.7)
+        run: pnpm check:budgets
+
+      - name: Smoke eval
+        run: pnpm bench:smoke
