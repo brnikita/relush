@@ -210,6 +210,9 @@ export function graphQuery(
           id: target.id,
           depth: Math.max(depth, 3),
         })) {
+          // File nodes are containers, not affected symbols. Counting them
+          // inflates the number the router uses to decide on escalation.
+          if (affected.kind === "file") continue;
           seen.set(affected.id, affected);
         }
       }

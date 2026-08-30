@@ -79,6 +79,18 @@ class B { query() {} }`,
     expect(ids).toEqual(["src/a.ts#A.query", "src/a.ts#B.query"]);
   });
 
+  it("strips the closing delimiter from a single-line doc comment", async () => {
+    // The common form for a short doc; keeping the */ leaks into every
+    // rendered signature the model sees.
+    const indexed = await indexSource(
+      "src/a.ts",
+      `/** Formats money. */
+export function fmt(): void {}`,
+    );
+
+    expect(indexed?.nodes.find((n) => n.name === "fmt")?.docLine).toBe("Formats money.");
+  });
+
   it("captures the first line of a doc comment", async () => {
     const indexed = await indexSource(
       "src/a.ts",

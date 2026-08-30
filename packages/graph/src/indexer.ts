@@ -192,7 +192,13 @@ function docLineOf(node: SyntaxNodeLike): string | undefined {
   if (previous?.type !== "comment") return undefined;
 
   for (const raw of previous.text.split("\n")) {
-    const line = raw.replace(/^\s*(?:\/\*\*?|\*\/|\*|\/\/)\s?/, "").trim();
+    const line = raw
+      // Leading delimiters: /**, /*, *, //
+      .replace(/^\s*(?:\/\*\*?|\*\/|\*|\/\/)\s?/, "")
+      // Trailing */ — a single-line `/** Doc. */` would otherwise keep it, and
+      // that form is the common case for short docs.
+      .replace(/\s*\*\/\s*$/, "")
+      .trim();
     if (line !== "" && line !== "/") return line.slice(0, 200);
   }
   return undefined;
