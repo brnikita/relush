@@ -174,3 +174,31 @@ describe("/compact and /clear", () => {
     expect((await run("/graph formatMoney")).output).toContain("formatMoney");
   });
 });
+
+describe("escalation end to end", () => {
+  it("escalates the session's layer after two failed verifications", async () => {
+    // DEVIATION-003 notes the invariant holds trivially at 0% because no eval
+    // task fails twice. This drives the path directly instead.
+    const before = (await run("/model")).output;
+    expect(before).toMatch(/layer: flash/);
+
+    session.router.recordResult(false);
+    session.router.recordResult(false);
+    session.router.route({ prompt: "fix the failing test" });
+
+    expect((await run("/model")).output).toMatch(/layer: escalation/);
+    expect((await run("/model")).output).toMatch(/escalated: true/);
+  });
+
+  it("returns to the cheap layer after two greens", async () => {
+    session.router.recordResult(true);
+    session.router.recordResult(true);
+    session.router.route({ prompt: "add a null check" });
+
+    expect((await run("/model")).output).toMatch(/layer: flash/);
+  });
+
+  it("keeps /cost reporting the invariant while escalated", async () => {
+    expect((await run("/cost")).output).toMatch(/15% limit/);
+  });
+});
