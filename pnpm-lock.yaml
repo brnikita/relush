@@ -7,6 +7,13 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@nodrel/ai':
+        specifier: workspace:*
+        version: link:packages/ai
+      '@nodrel/core':
+        specifier: workspace:*
+        version: link:packages/core
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.3.5

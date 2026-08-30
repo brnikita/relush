@@ -17,3 +17,14 @@ export type {
 } from "./extensions.ts";
 
 export const PACKAGE = "core" as const;
+
+export { PINNED_INSTRUCTIONS, SYSTEM_PROMPT } from "./prompt.ts";
+export type { ToolSchema } from "./tools.ts";
+export {
+  BASH_TOOL,
+  CORE_TOOLS,
+  EDIT_TOOL,
+  GRAPH_QUERY_TOOL,
+  READ_TOOL,
+  WRITE_TOOL,
+} from "./tools.ts";
