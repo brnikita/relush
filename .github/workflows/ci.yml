@@ -48,5 +48,13 @@ jobs:
       - name: Token budgets (SPEC §4.1 — never disable, per §0.7)
         run: pnpm check:budgets
 
+      - name: Graph performance (SPEC §4.2)
+        # Reduced corpus: CI runners are slower and more variable than a
+        # developer machine, so this guards against a regression in kind
+        # rather than certifying the 1M-LOC gate. The full run is local.
+        env:
+          BENCH_LINES: "100000"
+        run: pnpm bench:graph
+
       - name: Smoke eval
         run: pnpm bench:smoke
