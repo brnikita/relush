@@ -53,17 +53,29 @@ nodrel --history              # enable batched compaction
 
 ## What it actually saves
 
-Measured, not asserted. `navigation` suite, identical tasks, only the graph
-differing, three seeds, Welch's t-test on per-seed means:
+Measured, not asserted. `navigation` suite, 8 tasks x 3 seeds per configuration
+(48 runs), both run back to back, Welch's t-test on per-seed means:
 
 | | baseline | with graph | |
 |---|---|---|---|
-| tokens/task | 7,478 ± 587 | 5,860 ± 235 | **−21.6%**, significant |
-| cost/task | $0.00025 | $0.00016 | **−36%**, significant |
-| turns | 5.0 | 3.9 | **−22%** |
+| **cost/task** | $0.00028 ± $0.00001 | **$0.00016 ± $0.00002** | **−42.1%**, significant (t = −8.20) |
+| tokens/task | 7,080 ± 1,086 | 5,761 ± 441 | −18.6%, within noise |
+| turns | 4.4 | 3.9 | −10.8%, within noise |
+| wall time | 17.1 s | 23.3 s | +36.4%, within noise |
 | solve rate | 100% | 100% | unchanged |
 
-Reproduce with `pnpm eval:ab --suite navigation --seeds 3`.
+Cost is significant while tokens are not, which is not a contradiction: cost
+depends on the fresh/cached split rather than the raw count, and the graph
+replaces large uncacheable file reads with small structural queries. Its cost
+varies ±7% against the baseline's ±15% on tokens — roughly **twice as
+consistent**.
+
+Wall time is directionally worse. Startup indexing measures 99 ms for a repo
+this size, 1.6% of the difference, so indexing is not the cause; n = 3 cannot
+resolve what is. Reported because it is in the data.
+
+Reproduce with `pnpm eval:ab --suite navigation --seeds 3`. Full write-up in
+`eval/reports/p3-graph-ab.md`.
 
 Two claims this project does **not** make:
 
