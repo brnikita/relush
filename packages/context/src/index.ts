@@ -6,6 +6,8 @@
 export type { GraphOperation, GraphQueryRequest, GraphQueryResponse } from "./query.ts";
 export { DEFAULT_BUDGET, fitToBudget, graphQuery, renderNode } from "./query.ts";
 
+export type { RetrievalMiss } from "./retrieval-miss.ts";
+export { pathsInResponse, RetrievalTracker } from "./retrieval-miss.ts";
 export type { TaskMap, TaskMapOptions } from "./task-map.ts";
 export { buildTaskMap, DEFAULT_TASK_MAP_BUDGET } from "./task-map.ts";
 export type { GraphToolOptions, ToolResult } from "./tool.ts";
