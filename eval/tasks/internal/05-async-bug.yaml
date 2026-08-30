@@ -1,0 +1,14 @@
+id: async-bug
+suite: internal
+prompt: "loadAll() in load.js returns an array of Promises instead of resolved values. Fix it."
+files:
+  load.js: |
+    async function loadOne(id) {
+      return { id, ok: true };
+    }
+    async function loadAll(ids) {
+      return ids.map((id) => loadOne(id));
+    }
+    module.exports = { loadAll };
+verify: |
+  node -e "const {loadAll}=require('./load.js'); loadAll([1,2]).then(r=>{ if(!Array.isArray(r)) process.exit(1); if(r[0] && typeof r[0].then==='function') process.exit(1); if(r[0].id!==1||r[1].id!==2) process.exit(1); }).catch(()=>process.exit(1));"

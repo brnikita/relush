@@ -1,0 +1,11 @@
+id: numeric-sort
+suite: internal
+prompt: "sortNums() in sort.js sorts lexicographically instead of numerically. Fix it without mutating the caller's array."
+files:
+  sort.js: |
+    function sortNums(nums) {
+      return nums.sort();
+    }
+    module.exports = { sortNums };
+verify: |
+  node -e "const {sortNums}=require('./sort.js'); const input=[10,9,100,1]; const out=sortNums(input); if(JSON.stringify(out)!=='[1,9,10,100]') process.exit(1); if(JSON.stringify(input)!=='[10,9,100,1]') process.exit(1);"

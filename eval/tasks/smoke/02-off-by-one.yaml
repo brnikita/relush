@@ -1,0 +1,11 @@
+id: off-by-one
+suite: smoke
+prompt: "last() in list.js returns the wrong element - it is off by one. Fix it."
+files:
+  list.js: |
+    function last(items) {
+      return items[items.length];
+    }
+    module.exports = { last };
+verify: |
+  node -e "const {last}=require('./list.js'); if(last([1,2,3])!==3) process.exit(1); if(last(['a'])!=='a') process.exit(1);"

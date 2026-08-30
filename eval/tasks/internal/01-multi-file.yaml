@@ -1,0 +1,17 @@
+id: multi-file-rename
+suite: internal
+prompt: "Rename the function `calc` to `computeTotal` everywhere it is used, across all files. Keep behaviour identical."
+files:
+  calc.js: |
+    function calc(items) {
+      return items.reduce((s, i) => s + i.price, 0);
+    }
+    module.exports = { calc };
+  cart.js: |
+    const { calc } = require("./calc.js");
+    function checkout(items) {
+      return calc(items);
+    }
+    module.exports = { checkout };
+verify: |
+  node -e "const c=require('./calc.js'); const {checkout}=require('./cart.js'); if(typeof c.computeTotal!=='function') process.exit(1); if(c.calc) process.exit(1); if(checkout([{price:2},{price:3}])!==5) process.exit(1);"

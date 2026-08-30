@@ -1,0 +1,11 @@
+id: empty-input
+suite: internal
+prompt: "average() in stats.js returns NaN for an empty array. It should return 0 instead."
+files:
+  stats.js: |
+    function average(nums) {
+      return nums.reduce((a, b) => a + b, 0) / nums.length;
+    }
+    module.exports = { average };
+verify: |
+  node -e "const {average}=require('./stats.js'); if(average([])!==0) process.exit(1); if(average([2,4])!==3) process.exit(1);"

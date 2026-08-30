@@ -1,0 +1,17 @@
+id: failing-test
+suite: smoke
+prompt: "Run the test with `node test.js`. It fails. Fix the source so the test passes. Do not modify test.js."
+files:
+  slug.js: |
+    function slugify(s) {
+      return s.toLowerCase().replace(/ /g, "_");
+    }
+    module.exports = { slugify };
+  test.js: |
+    const { slugify } = require("./slug.js");
+    const assert = require("node:assert");
+    assert.strictEqual(slugify("Hello World"), "hello-world");
+    assert.strictEqual(slugify("A B C"), "a-b-c");
+    console.log("ok");
+verify: |
+  node -e "const fs=require('fs'); const t=fs.readFileSync('test.js','utf8'); if(!t.includes('hello-world')) process.exit(1);" && node test.js

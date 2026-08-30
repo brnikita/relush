@@ -1,0 +1,11 @@
+id: regex-fix
+suite: internal
+prompt: "isEmail() in valid.js accepts strings without a dot in the domain. Tighten it so 'a@b' is rejected but 'a@b.co' is accepted."
+files:
+  valid.js: |
+    function isEmail(s) {
+      return /^[^@]+@[^@]+$/.test(s);
+    }
+    module.exports = { isEmail };
+verify: |
+  node -e "const {isEmail}=require('./valid.js'); if(isEmail('a@b')) process.exit(1); if(!isEmail('a@b.co')) process.exit(1); if(isEmail('nope')) process.exit(1);"

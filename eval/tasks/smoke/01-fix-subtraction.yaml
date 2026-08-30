@@ -1,0 +1,11 @@
+id: fix-subtraction
+suite: smoke
+prompt: "math.js has a bug: add() subtracts instead of adding. Fix it."
+files:
+  math.js: |
+    function add(a, b) {
+      return a - b;
+    }
+    module.exports = { add };
+verify: |
+  node -e "const {add}=require('./math.js'); if(add(2,3)!==5) process.exit(1); if(add(-1,1)!==0) process.exit(1);"

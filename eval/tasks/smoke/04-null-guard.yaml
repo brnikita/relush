@@ -1,0 +1,11 @@
+id: null-guard
+suite: smoke
+prompt: "greet() in greet.js throws when name is null or undefined. Make it return 'Hello, stranger!' in that case."
+files:
+  greet.js: |
+    function greet(name) {
+      return "Hello, " + name.trim() + "!";
+    }
+    module.exports = { greet };
+verify: |
+  node -e "const {greet}=require('./greet.js'); if(greet(null)!=='Hello, stranger!') process.exit(1); if(greet(undefined)!=='Hello, stranger!') process.exit(1); if(greet(' Ana ')!=='Hello, Ana!') process.exit(1);"

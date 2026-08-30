@@ -32,3 +32,7 @@ Thumbs.db
 
 # typecheck build artifacts
 .tsbuild/
+
+# python eval env
+eval/.venv/
+eval/uv.lock

@@ -1,0 +1,16 @@
+id: write-test
+suite: internal
+prompt: "Write a test file test.js that verifies parse() handles valid input, invalid JSON, and empty string. Use node:assert. It must pass with `node test.js`."
+files:
+  parse.js: |
+    function parse(text) {
+      if (!text) return null;
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    }
+    module.exports = { parse };
+verify: |
+  node test.js && node -e "const fs=require('fs'); const t=fs.readFileSync('test.js','utf8'); if(!t.includes('assert')) process.exit(1); if(t.length<80) process.exit(1);"

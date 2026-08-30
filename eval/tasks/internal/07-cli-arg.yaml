@@ -1,0 +1,9 @@
+id: cli-flag
+suite: internal
+prompt: "Add support for a --upper flag to cli.js. With it, the echoed text is uppercased. Without it, behaviour is unchanged."
+files:
+  cli.js: |
+    const text = process.argv.slice(2).join(" ");
+    console.log(text);
+verify: |
+  node -e "const {execSync}=require('child_process'); const a=execSync('node cli.js hi there').toString().trim(); if(a!=='hi there') process.exit(1); const b=execSync('node cli.js --upper hi there').toString().trim(); if(b!=='HI THERE') process.exit(1);"

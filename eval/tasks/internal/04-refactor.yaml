@@ -1,0 +1,11 @@
+id: remove-duplication
+suite: internal
+prompt: "fmt.js has three nearly identical functions. Refactor to remove the duplication while keeping all three exports working exactly as before."
+files:
+  fmt.js: |
+    function usd(n) { return "$" + n.toFixed(2); }
+    function eur(n) { return "\u20ac" + n.toFixed(2); }
+    function gbp(n) { return "\u00a3" + n.toFixed(2); }
+    module.exports = { usd, eur, gbp };
+verify: |
+  node -e "const f=require('./fmt.js'); if(f.usd(1.5)!=='\$1.50') process.exit(1); if(f.eur(2)!=='\u20ac2.00') process.exit(1); if(f.gbp(3.456)!=='\u00a33.46') process.exit(1);"
