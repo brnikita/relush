@@ -17,6 +17,8 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@nodrel/telemetry": "workspace:*"
+    "@earendil-works/pi-ai": "^0.84.4",
+    "@nodrel/telemetry": "workspace:*",
+    "gpt-tokenizer": "^4.0.0"
   }
 }
