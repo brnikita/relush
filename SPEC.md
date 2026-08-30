@@ -488,6 +488,34 @@ Verify: `pnpm test && pnpm check:budgets`
 
 ### P3 — Graph indexer and context engine ⬅ CURRENT
 
+**Measured so far.** `navigation` suite, 3 tasks × 3 seeds, `glm-5.3-flash`,
+identical tasks, only `--graph` differing:
+
+| | baseline | with graph | change | verdict |
+|---|---|---|---|---|
+| solve rate | 100% ± 0% | 100% ± 0% | — | — |
+| tokens/task | 7,478 ± 587 | 5,860 ± 235 | **−21.6%** | outside noise |
+| cost/task | $0.00025 | $0.00016 | **−36%** | outside noise |
+| mean turns | 5.0 | 3.9 | **−22%** | — |
+| cache hit | 85.8% | 88.3% | +2.5pp | within noise |
+
+Both headline differences exceed the pooled spread, so unlike the withdrawn
+masking figure these are effects rather than variance. The turn reduction is a
+latency win as well as a token one: the agent locates things in fewer round
+trips.
+
+**The gate is not yet met.** It requires cost ≤ 50% of baseline; this is 64%.
+Remaining levers, in expected order of value: expanding language coverage (a
+task in an unindexed language falls back to file reads entirely), the task map
+injected as pinned context so orientation costs nothing per turn, and
+`tests_for`/`impact` becoming genuinely useful once SCIP resolves references
+precisely.
+
+Performance gates (§4.2) pass on a synthetic 1M-LOC corpus — index 32.3 s,
+incremental 2.82 s, query p95 1.8 ms — but are **not claimed** until
+`eval/corpus.lock` pins the real repos (ADR-001).
+
+
 Tasks: `GraphStore` interface and conformance suite; SQLite implementation;
 `web-tree-sitter` indexer (TS/JS first, then 15 languages); incremental
 indexing; `graph_query` with budgets and `expand`; task map; retrieval-miss
