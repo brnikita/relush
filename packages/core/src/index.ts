@@ -19,6 +19,8 @@ export type {
 export const PACKAGE = "core" as const;
 
 export { PINNED_INSTRUCTIONS, SYSTEM_PROMPT } from "./prompt.ts";
+export type { CreateAgentOptions } from "./runtime.ts";
+export { createAgent, ModelNotFoundError, resolveModel } from "./runtime.ts";
 export type { ToolSchema } from "./tools.ts";
 export {
   BASH_TOOL,
