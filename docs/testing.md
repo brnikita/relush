@@ -31,3 +31,11 @@ cap makes a full `eval:baseline` impractical, and `openrouter/free` is unusable
 here because it picks a random backend per call, which destroys reproducibility.
 
 Never run against the free tier and never in CI.
+
+## Lint configuration note
+
+`complexity/useLiteralKeys` is disabled in `biome.json`. It contradicts the
+TypeScript settings this project deliberately uses: with
+`noUncheckedIndexedAccess` and index-signature types such as `process.env`,
+bracket access is what the compiler requires, so the rule would fight `tsc` on
+every access. No other recommended rule is disabled.

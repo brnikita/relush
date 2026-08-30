@@ -133,7 +133,8 @@ describe("maskOldOutputs", () => {
     );
 
     expect(image).toBeDefined();
-    expect((image?.content as { type: string }[])[0]?.type).toBe("image");
+    const parts = (image?.content ?? []) as { type: string }[];
+    expect(parts[0]?.type).toBe("image");
   });
 
   it("reports each masked output for telemetry", () => {
