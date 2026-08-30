@@ -1,0 +1,29 @@
+{
+  "name": "@nodrel/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@nodrel/core": "workspace:*",
+    "@nodrel/ai": "workspace:*",
+    "@nodrel/graph": "workspace:*",
+    "@nodrel/context": "workspace:*",
+    "@nodrel/history": "workspace:*",
+    "@nodrel/router": "workspace:*",
+    "@nodrel/local": "workspace:*",
+    "@nodrel/telemetry": "workspace:*"
+  }
+}

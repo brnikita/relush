@@ -21,6 +21,98 @@ importers:
         specifier: ^4.1.9
         version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3))
 
+  packages/ai:
+    dependencies:
+      '@nodrel/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
+
+  packages/cli:
+    dependencies:
+      '@nodrel/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@nodrel/context':
+        specifier: workspace:*
+        version: link:../context
+      '@nodrel/core':
+        specifier: workspace:*
+        version: link:../core
+      '@nodrel/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@nodrel/history':
+        specifier: workspace:*
+        version: link:../history
+      '@nodrel/local':
+        specifier: workspace:*
+        version: link:../local
+      '@nodrel/router':
+        specifier: workspace:*
+        version: link:../router
+      '@nodrel/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
+
+  packages/context:
+    dependencies:
+      '@nodrel/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@nodrel/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
+
+  packages/core:
+    dependencies:
+      '@nodrel/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@nodrel/context':
+        specifier: workspace:*
+        version: link:../context
+      '@nodrel/history':
+        specifier: workspace:*
+        version: link:../history
+      '@nodrel/router':
+        specifier: workspace:*
+        version: link:../router
+      '@nodrel/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
+
+  packages/graph:
+    dependencies:
+      '@nodrel/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
+
+  packages/history:
+    dependencies:
+      '@nodrel/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@nodrel/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
+
+  packages/local:
+    dependencies:
+      '@nodrel/ai':
+        specifier: workspace:*
+        version: link:../ai
+
+  packages/router:
+    dependencies:
+      '@nodrel/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@nodrel/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
+
+  packages/telemetry: {}
+
 packages:
 
   '@biomejs/biome@2.5.11':

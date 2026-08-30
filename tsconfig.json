@@ -1,11 +1,16 @@
 {
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "composite": false,
-    "incremental": false,
-    "types": ["node", "vitest/globals"]
-  },
-  "include": ["scripts/**/*.ts", "*.config.ts"],
-  "exclude": ["node_modules", "**/dist"]
+  "//": "Solution file. `tsc --build` typechecks every project in dependency order.",
+  "files": [],
+  "references": [
+    { "path": "./packages/telemetry" },
+    { "path": "./packages/ai" },
+    { "path": "./packages/graph" },
+    { "path": "./packages/context" },
+    { "path": "./packages/history" },
+    { "path": "./packages/router" },
+    { "path": "./packages/local" },
+    { "path": "./packages/core" },
+    { "path": "./packages/cli" },
+    { "path": "./tsconfig.scripts.json" }
+  ]
 }
