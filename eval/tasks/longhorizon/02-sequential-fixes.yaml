@@ -1,0 +1,23 @@
+id: sequential-fixes
+suite: longhorizon
+timeout_s: 900
+prompt: >-
+  Each file in src/ has one bug making its test fail. Run `node test.js` to
+  see failures, fix the files one at a time, and re-run the test after each
+  fix until it passes. Do not modify test.js.
+files:
+  src/a.js: "module.exports.double = (n) => n + n + 1;\n"
+  src/b.js: "module.exports.triple = (n) => n * 2;\n"
+  src/c.js: "module.exports.square = (n) => n + n;\n"
+  src/d.js: "module.exports.negate = (n) => n;\n"
+  src/e.js: "module.exports.halve = (n) => n * 2;\n"
+  test.js: |
+    const assert = require("node:assert");
+    assert.strictEqual(require("./src/a.js").double(3), 6, "double");
+    assert.strictEqual(require("./src/b.js").triple(3), 9, "triple");
+    assert.strictEqual(require("./src/c.js").square(3), 9, "square");
+    assert.strictEqual(require("./src/d.js").negate(3), -3, "negate");
+    assert.strictEqual(require("./src/e.js").halve(8), 4, "halve");
+    console.log("ok");
+verify: |
+  node -e "const fs=require('fs'); const t=fs.readFileSync('test.js','utf8'); if(!t.includes('halve')) process.exit(1);" && node test.js

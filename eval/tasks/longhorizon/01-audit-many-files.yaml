@@ -1,0 +1,22 @@
+id: audit-many-files
+suite: longhorizon
+timeout_s: 900
+prompt: >-
+  This project has modules in src/. Every module should export a function
+  named `run`. Read each file under src/ one at a time to check, then create
+  report.json listing, under the key "missing", the filenames (basename only,
+  e.g. "m03.js") of every module that does not export `run`. Sort the list
+  alphabetically.
+files:
+  src/m01.js: "function run() { return 1; }\nmodule.exports = { run };\n"
+  src/m02.js: "function run() { return 2; }\nmodule.exports = { run };\n"
+  src/m03.js: "function go() { return 3; }\nmodule.exports = { go };\n"
+  src/m04.js: "function run() { return 4; }\nmodule.exports = { run };\n"
+  src/m05.js: "function start() { return 5; }\nmodule.exports = { start };\n"
+  src/m06.js: "function run() { return 6; }\nmodule.exports = { run };\n"
+  src/m07.js: "function run() { return 7; }\nmodule.exports = { run };\n"
+  src/m08.js: "function begin() { return 8; }\nmodule.exports = { begin };\n"
+  src/m09.js: "function run() { return 9; }\nmodule.exports = { run };\n"
+  src/m10.js: "function run() { return 10; }\nmodule.exports = { run };\n"
+verify: |
+  node -e "const r=require('./report.json'); const m=(r.missing||[]).slice().sort(); if(JSON.stringify(m)!==JSON.stringify(['m03.js','m05.js','m08.js'])) { console.error('got', JSON.stringify(m)); process.exit(1);} "
