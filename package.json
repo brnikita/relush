@@ -1,0 +1,27 @@
+{
+  "name": "nodrel-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "check:budgets": "node --experimental-strip-types scripts/check-budgets.ts",
+    "bench:smoke": "node --experimental-strip-types scripts/bench-smoke.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.5",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
+  }
+}
