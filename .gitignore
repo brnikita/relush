@@ -1,0 +1,31 @@
+# secrets — this rule must exist before any file that could reference a key
+.env
+.env.*
+!.env.example
+
+# agent working data
+.agent/
+
+# dependencies & build
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# test & coverage
+coverage/
+.vitest/
+
+# eval artifacts (reports are committed; raw runs are not)
+eval/.runs/
+eval/.cache/
+
+# python (eval harness)
+.venv/
+__pycache__/
+*.pyc
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.log
