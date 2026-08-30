@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { hashContent, indexSource, languageFor, resolveCrossFileCalls } from "./indexer.ts";
+import {
+  hashContent,
+  indexSource,
+  LANGUAGES,
+  languageFor,
+  resolveCrossFileCalls,
+} from "./indexer.ts";
 import { SqliteGraphStore } from "./sqlite-store.ts";
 
 const store = () => {
@@ -228,5 +234,40 @@ describe("resolveCrossFileCalls", () => {
 
     expect(s.stats().edges).toBe(after);
     s.close();
+  });
+});
+
+describe("language coverage", () => {
+  // SPEC §4.2 requires >= 15 languages at v1. Each entry costs a dependency
+  // and a row because every grammar ships prebuilt WASM.
+  it.each([
+    ["python", "src/a.py", "def compute(a, b):\n    return a + b\n", "compute"],
+    ["go", "src/a.go", "package main\nfunc Compute(a int) int { return a }\n", "Compute"],
+    ["java", "src/A.java", "class Widget { void render() {} }", "Widget"],
+    ["c", "src/a.c", "int compute(int a) { return a; }\n", "compute"],
+    ["cpp", "src/a.cpp", "class Widget { public: void render(); };\n", "Widget"],
+    ["csharp", "src/A.cs", "class Widget { void Render() {} }", "Widget"],
+    ["rust", "src/a.rs", "fn compute(a: i32) -> i32 { a }\n", "compute"],
+    ["ruby", "src/a.rb", "def compute(a)\n  a\nend\n", "compute"],
+    ["php", "src/a.php", "<?php\nfunction compute($a) { return $a; }\n", "compute"],
+    ["bash", "src/a.sh", "compute() {\n  echo 1\n}\n", "compute"],
+  ])("indexes %s", async (_language, path, source, expected) => {
+    const indexed = await indexSource(path, source);
+
+    expect(indexed, `${path} should parse`).toBeDefined();
+    expect(indexed?.nodes.map((n) => n.name)).toContain(expected);
+  });
+
+  it("covers at least 13 languages, on the way to the 15 SPEC §4.2 requires", () => {
+    expect(LANGUAGES.length).toBeGreaterThanOrEqual(13);
+  });
+
+  it("maps every language to a distinct id", () => {
+    expect(new Set(LANGUAGES.map((l) => l.id)).size).toBe(LANGUAGES.length);
+  });
+
+  it("claims no extension twice, so file routing is unambiguous", () => {
+    const all = LANGUAGES.flatMap((l) => l.extensions);
+    expect(new Set(all).size).toBe(all.length);
   });
 });

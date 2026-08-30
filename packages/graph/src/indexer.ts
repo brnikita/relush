@@ -32,11 +32,15 @@ export interface LanguageSpec {
 }
 
 /**
- * Languages wired up so far.
+ * Supported languages (SPEC §4.2 requires ≥ 15 at v1).
  *
- * SPEC §4.2 requires 15 at v1. TypeScript and JavaScript come first because
- * they are what this repository is written in, so the indexer can be validated
- * against real code rather than fixtures.
+ * Every grammar here ships a prebuilt `.wasm`, so adding a language costs a
+ * dependency and a row — no compiler, no build step. That is the dividend of
+ * choosing WASM over native bindings in ADR-001.
+ *
+ * Coverage matters more than it looks: a file in an unindexed language falls
+ * back to whole-file reads entirely, so the graph contributes nothing to a task
+ * in that language.
  */
 export const LANGUAGES: readonly LanguageSpec[] = [
   {
@@ -44,16 +48,34 @@ export const LANGUAGES: readonly LanguageSpec[] = [
     extensions: ["ts", "mts", "cts"],
     wasmPath: "tree-sitter-typescript/tree-sitter-typescript.wasm",
   },
-  {
-    id: "tsx",
-    extensions: ["tsx"],
-    wasmPath: "tree-sitter-typescript/tree-sitter-tsx.wasm",
-  },
+  { id: "tsx", extensions: ["tsx"], wasmPath: "tree-sitter-typescript/tree-sitter-tsx.wasm" },
   {
     id: "javascript",
     extensions: ["js", "mjs", "cjs", "jsx"],
     wasmPath: "tree-sitter-javascript/tree-sitter-javascript.wasm",
   },
+  {
+    id: "python",
+    extensions: ["py", "pyi"],
+    wasmPath: "tree-sitter-python/tree-sitter-python.wasm",
+  },
+  { id: "go", extensions: ["go"], wasmPath: "tree-sitter-go/tree-sitter-go.wasm" },
+  { id: "java", extensions: ["java"], wasmPath: "tree-sitter-java/tree-sitter-java.wasm" },
+  { id: "c", extensions: ["c", "h"], wasmPath: "tree-sitter-c/tree-sitter-c.wasm" },
+  {
+    id: "cpp",
+    extensions: ["cpp", "cc", "cxx", "hpp", "hh"],
+    wasmPath: "tree-sitter-cpp/tree-sitter-cpp.wasm",
+  },
+  {
+    id: "csharp",
+    extensions: ["cs"],
+    wasmPath: "tree-sitter-c-sharp/tree-sitter-c_sharp.wasm",
+  },
+  { id: "rust", extensions: ["rs"], wasmPath: "tree-sitter-rust/tree-sitter-rust.wasm" },
+  { id: "ruby", extensions: ["rb"], wasmPath: "tree-sitter-ruby/tree-sitter-ruby.wasm" },
+  { id: "php", extensions: ["php"], wasmPath: "tree-sitter-php/tree-sitter-php.wasm" },
+  { id: "bash", extensions: ["sh", "bash"], wasmPath: "tree-sitter-bash/tree-sitter-bash.wasm" },
 ] as const;
 
 const byExtension = new Map<string, LanguageSpec>(
@@ -63,8 +85,17 @@ const byExtension = new Map<string, LanguageSpec>(
 export const languageFor = (path: string): LanguageSpec | undefined =>
   byExtension.get(path.split(".").pop()?.toLowerCase() ?? "");
 
-/** Node types that define a symbol, mapped to our node kinds. */
+/**
+ * Node types that define a symbol, mapped to our node kinds.
+ *
+ * Union across every supported grammar rather than a table per language.
+ * Tree-sitter node type names are largely conventional across grammars
+ * (`function_definition`, `class_declaration`), and where they differ the names
+ * do not collide — so one map stays correct and avoids a dispatch layer that
+ * would need updating for every new language.
+ */
 const DECLARATION_KINDS: Record<string, NodeKind> = {
+  // JavaScript / TypeScript
   function_declaration: "function",
   generator_function_declaration: "function",
   class_declaration: "class",
@@ -72,6 +103,30 @@ const DECLARATION_KINDS: Record<string, NodeKind> = {
   interface_declaration: "type",
   type_alias_declaration: "type",
   enum_declaration: "type",
+  // Python, C, C++, PHP, Ruby, Bash
+  function_definition: "function",
+  class_definition: "class",
+  method: "method",
+  singleton_method: "method",
+  // Go
+  method_declaration: "method",
+  type_declaration: "type",
+  // Java, C#
+  constructor_declaration: "method",
+  record_declaration: "class",
+  struct_declaration: "type",
+  // C / C++
+  class_specifier: "class",
+  struct_specifier: "type",
+  enum_specifier: "type",
+  // Rust
+  function_item: "function",
+  struct_item: "type",
+  enum_item: "type",
+  trait_item: "type",
+  impl_item: "class",
+  // Ruby
+  module: "module",
 };
 
 interface SyntaxNodeLike {
@@ -143,11 +198,34 @@ function docLineOf(node: SyntaxNodeLike): string | undefined {
   return undefined;
 }
 
+/**
+ * Extracts a declaration's name across grammar dialects.
+ *
+ * Most grammars expose a `name` field. C and C++ do not: a
+ * `function_definition` carries a `declarator` chain that has to be walked down
+ * to the identifier. Without this, every C and C++ symbol is invisible to the
+ * graph while the file still parses cleanly — a silent gap rather than an error.
+ */
+function declarationName(node: SyntaxNodeLike): string | undefined {
+  const direct = node.childForFieldName("name")?.text;
+  if (direct) return direct;
+
+  // C/C++: function_definition → declarator → … → identifier
+  let declarator = node.childForFieldName("declarator");
+  for (let depth = 0; declarator && depth < 6; depth++) {
+    if (declarator.type === "identifier" || declarator.type === "field_identifier") {
+      return declarator.text;
+    }
+    declarator = declarator.childForFieldName("declarator");
+  }
+  return undefined;
+}
+
 /** Nearest enclosing class name, so methods get a qualified id. */
 function enclosingClass(node: SyntaxNodeLike): string | undefined {
   for (let parent = node.parent; parent; parent = parent.parent) {
-    if (parent.type === "class_declaration") {
-      return parent.childForFieldName("name")?.text;
+    if (parent.type === "class_declaration" || parent.type === "class_specifier") {
+      return declarationName(parent);
     }
   }
   return undefined;
@@ -203,7 +281,7 @@ export async function indexSource(
   const visit = (node: SyntaxNodeLike): void => {
     const declKind = DECLARATION_KINDS[node.type];
     if (declKind) {
-      const name = node.childForFieldName("name")?.text;
+      const name = declarationName(node);
       if (name) {
         const owner = declKind === "method" ? enclosingClass(node) : undefined;
         const qualified = owner ? `${owner}.${name}` : name;
@@ -244,7 +322,7 @@ export async function indexSource(
         for (let parent = node.parent; parent; parent = parent.parent) {
           const kind = DECLARATION_KINDS[parent.type];
           if (kind) {
-            const parentName = parent.childForFieldName("name")?.text;
+            const parentName = declarationName(parent);
             if (parentName) {
               const parentOwner = kind === "method" ? enclosingClass(parent) : undefined;
               owner = `${repoRelativePath}#${parentOwner ? `${parentOwner}.${parentName}` : parentName}`;
