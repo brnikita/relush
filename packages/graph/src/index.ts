@@ -14,6 +14,8 @@ export {
   languageFor,
   resolveCrossFileCalls,
 } from "./indexer.ts";
+export type { McpRequest, McpResponse, McpServerOptions } from "./mcp.ts";
+export { handleMcpRequest, parseMcpLine } from "./mcp.ts";
 export type { SqliteStoreOptions } from "./sqlite-store.ts";
 export { SqliteGraphStore } from "./sqlite-store.ts";
 export type {
