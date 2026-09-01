@@ -39,6 +39,7 @@ export interface TaskRunOptions {
    * any comparison has to be against.
    */
   readonly graph?: boolean;
+  readonly maxTokens?: number;
 }
 
 export interface TaskRunResult {
@@ -139,6 +140,7 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
     cwd: options.cwd,
     sessionId,
     extensions,
+    ...(options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
     ...(graph
       ? {
           graph: {
@@ -174,6 +176,21 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
 
   // Usage lives on assistant messages; every one is a provider round trip.
   const assistantMessages = agent.state.messages.filter((m) => m.role === "assistant");
+
+  // A provider error ends the turn with stopReason "error" and no exception,
+  // so without this check a 402 or a bad model id reports ok:true with zero
+  // tokens -- a "success" that solved nothing. SPEC 4.9 names this defect.
+  const failed = assistantMessages.find(
+    (m) => (m as unknown as { stopReason?: string }).stopReason === "error",
+  );
+  if (error === undefined && failed) {
+    error = `provider error: ${
+      (failed as unknown as { errorMessage?: string }).errorMessage?.slice(0, 300) ?? "unknown"
+    }`;
+  }
+  if (error === undefined && assistantMessages.length === 0) {
+    error = "model produced no response";
+  }
   for (const [index, message] of assistantMessages.entries()) {
     const usage = (message as unknown as { usage?: PiUsage }).usage;
     if (!usage) continue;

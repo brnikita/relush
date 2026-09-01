@@ -72,6 +72,15 @@ export interface CreateAgentOptions {
    * what the P1 baseline measured, and what any graph comparison is against.
    */
   readonly graph?: GraphToolDeps;
+  /**
+   * Cap on completion tokens per request.
+   *
+   * Pi defaults to the model's maximum, and OpenRouter pre-authorises that
+   * amount against the account balance -- so a 128k default is refused with a
+   * 402 the moment credits run low, regardless of how short the answer would
+   * have been. 8k is far above any agent turn and keeps the pre-auth honest.
+   */
+  readonly maxTokens?: number;
 }
 
 export class ModelNotFoundError extends Error {
@@ -86,7 +95,13 @@ export function resolveModel(modelId: string): Model<never> {
   const provider = openrouterProvider();
   const model = provider.getModels().find((m) => m.id === modelId);
   if (!model) throw new ModelNotFoundError(modelId);
-  return model as Model<never>;
+  // Pi emits `max_completion_tokens` by default, but OpenRouter pre-authorises
+  // the request against the balance using `max_tokens` -- which then falls back
+  // to the model's 128k maximum and is refused with a 402 the moment credits
+  // run low, however short the answer would be. Forcing the field keeps the
+  // cap we set and the cap OpenRouter checks the same number.
+  const compat = (model as unknown as { compat?: Record<string, unknown> }).compat ?? {};
+  return { ...model, compat: { ...compat, maxTokensField: "max_tokens" } } as Model<never>;
 }
 
 /**
@@ -117,7 +132,15 @@ export function createAgent(options: CreateAgentOptions): Agent {
   if (options.graph) tools.push(createGraphQueryTool(options.graph));
 
   return new Agent({
-    streamFn: provider.streamSimple.bind(provider) as never,
+    streamFn: ((model: unknown, context: unknown, opts?: Record<string, unknown>) =>
+      provider.streamSimple(
+        model as never,
+        context as never,
+        {
+          ...opts,
+          maxTokens: options.maxTokens ?? 8192,
+        } as never,
+      )) as never,
     getApiKey: () => options.apiKey,
     initialState: {
       systemPrompt: options.systemPrompt ?? SYSTEM_PROMPT,

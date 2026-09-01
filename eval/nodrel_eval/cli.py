@@ -104,15 +104,17 @@ def _ab(args) -> int:
     history = args.treatment in ("history", "both")
 
     log = lambda text: print(text, file=sys.stderr)
-    log("A/B on %d task(s) x %d seed(s), %s" % (len(tasks), args.seeds, args.model))
-    log("  control:   baseline harness")
-    log("  treatment: %s" % args.treatment)
+    control_model = args.control_model or args.model
+    treatment_model = args.treatment_model or args.model
+    log("A/B on %d task(s) x %d seed(s)" % (len(tasks), args.seeds))
+    log("  control:   baseline harness on %s" % control_model)
+    log("  treatment: %s on %s" % (args.treatment, treatment_model))
 
     log("running control...")
-    control = run_suite(tasks, args.model, args.seeds, progress=_progress)
+    control = run_suite(tasks, control_model, args.seeds, progress=_progress)
     log("running treatment...")
     treatment = run_suite(
-        tasks, args.model, args.seeds, progress=_progress, history=history, graph=graph
+        tasks, treatment_model, args.seeds, progress=_progress, history=history, graph=graph
     )
 
     metrics = [
@@ -126,8 +128,8 @@ def _ab(args) -> int:
     print("")
     print(rule)
     print(
-        "A/B: baseline vs %s  --  %d tasks x %d seeds"
-        % (args.treatment, len(tasks), args.seeds)
+        "A/B: %s (baseline) vs %s (%s)  --  %d tasks x %d seeds"
+        % (control_model, treatment_model, args.treatment, len(tasks), args.seeds)
     )
     print(rule)
 
@@ -189,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
         choices=["graph", "history", "both"],
         help="what to enable on the treatment side",
     )
+    p.add_argument("--control-model", default=None, help="model for the control side")
+    p.add_argument("--treatment-model", default=None, help="model for the treatment side")
 
     p = sub.add_parser("compare")
     p.add_argument("--against", default="m0")

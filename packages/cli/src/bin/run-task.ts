@@ -16,6 +16,7 @@ interface Args {
   timeoutMs: number;
   history: boolean;
   graph: boolean;
+  maxTokens: number | undefined;
 }
 
 function parseArgs(argv: readonly string[]): Args {
@@ -39,6 +40,7 @@ function parseArgs(argv: readonly string[]): Args {
     timeoutMs: Number(get("--timeout-ms") ?? 600_000),
     history: argv.includes("--history"),
     graph: argv.includes("--graph"),
+    maxTokens: get("--max-tokens") === undefined ? undefined : Number(get("--max-tokens")),
   };
 }
 
@@ -65,6 +67,7 @@ async function main(): Promise<number> {
     timeoutMs: args.timeoutMs,
     history: args.history,
     graph: args.graph,
+    ...(args.maxTokens === undefined ? {} : { maxTokens: args.maxTokens }),
   });
 
   process.stdout.write(`${JSON.stringify(result)}\n`);
