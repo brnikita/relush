@@ -125,6 +125,7 @@ pnpm bench:graph    # SPEC §4.2 index and query performance
 pnpm eval:ab        # A/B a configuration change with a significance test
 ```
 
+`docs/ROADMAP.md` is what remains to reach a product, ordered by leverage.
 `SPEC.md` is the authoritative design document. `docs/decisions/` records every
 choice that went against the spec, and why — including the ones that turned out
 to be mistakes.
