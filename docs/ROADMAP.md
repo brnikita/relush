@@ -178,7 +178,7 @@ Tasks, in order of risk:
 | | |
 |---|---|
 | Done | No native dependencies (WASM parsing, `node:sqlite`) — builds anywhere without a C++ toolchain. **[2026-09-02] ✅ Secret scanner** — 12 gitleaks-shaped rules, runs as the last history stage on every role including tool results, typed placeholders, redactions in the audit log (18 tests, verified live) |
-| Missing | Installer, binaries, BYOK keychain, offline mode, crash recovery, gateway client |
+| Missing | Installer, binaries, BYOK keychain, offline mode, gateway client. **[2026-09-02] ✅ Crash-safe journal** — every message appended synchronously to `.agent/sessions/<id>.jsonl`; torn trailing lines tolerated on read (5 tests, `kill -9` verified live). Resume (`--resume <id>`) not yet wired |
 | Done means | `curl -fsSL <domain> \| sh` produces a working binary on macOS-arm64 and linux-x64 CI runners; a session survives `kill -9` mid-tool-call; no API key ever appears in an outbound prompt |
 | Estimate | 3 weeks |
 
@@ -189,7 +189,9 @@ Tasks:
    `OPENROUTER_API_KEY=[REDACTED:openrouter-key]`. GitHub push protection
    flagged a test fixture as a real token on first push — fixtures are now
    assembled from parts.
-2. Crash-safe session state: resume after `kill -9` during a tool call.
+2. ~~Crash-safe session state~~ ✅ journal done; `--resume` still to wire.
+   Verified live: a completed session survived a `kill -9` with 4/4 records
+   intact. A turn in flight is lost, everything before it is kept.
 3. BYOK via OS keychain for OpenRouter / Anthropic / OpenAI keys.
 4. Installer and per-platform binaries; `scripts/install-e2e.sh` on CI.
 5. Offline mode: cached limits, local-only or BYOK.
@@ -240,6 +242,7 @@ if a 24 GB machine is available it moves to week 3.
 | 2026-09-02 | Task map pinned into the system prompt (item 3.1) | unit + invariant tests |
 | 2026-09-02 | Retrieval-miss events wired to telemetry (item 3.3) | unit tests |
 | 2026-09-02 | Config import from other agents' rule files (item 5.4) | free model, live |
+| 2026-09-02 | Crash-safe conversation journal (item 6.2, journal half) | `kill -9`, live |
 | 2026-09-02 | Free-model A/B on `north-mini-code:free`: tokens −38.1% significant, replicating the GLM result on a second model family; solve-rate delta confounded by model mix (`eval/reports/free-model-ab.md`) | free models, 48 runs |
 
 ## What this plan refuses to do

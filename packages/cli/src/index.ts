@@ -9,6 +9,8 @@ export type { CostReportOptions } from "./cost.ts";
 export { costReport } from "./cost.ts";
 export type { ImportedRules } from "./import-config.ts";
 export { importRules } from "./import-config.ts";
+export type { JournalReadResult, JournalRecord } from "./journal.ts";
+export { Journal } from "./journal.ts";
 export type { SessionOptions, TurnResult } from "./session.ts";
 export { Session } from "./session.ts";
 

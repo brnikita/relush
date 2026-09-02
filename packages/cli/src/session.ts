@@ -14,6 +14,7 @@ import { Router } from "@nodrel/router";
 import type { RetrievalMissEvent, StepEvent } from "@nodrel/telemetry";
 import { JsonlSink } from "@nodrel/telemetry";
 import { importRules } from "./import-config.ts";
+import { Journal } from "./journal.ts";
 
 /**
  * A `nodrel` session: the agent plus everything that makes it cheap.
@@ -81,6 +82,9 @@ export class Session {
   private readonly retrieval = new RetrievalTracker();
   /** Rule files imported on first turn, for the user's information. */
   importedRules: readonly string[] = [];
+  /** Crash-safe transcript; every message is on disk before the next turn. */
+  private readonly journal: Journal;
+  private journaled = 0;
   private queryCounter = 0;
 
   constructor(options: SessionOptions) {
@@ -90,6 +94,7 @@ export class Session {
     this.modelId = options.modelId ?? DEFAULT_MODEL;
     this.router = new Router({ localAvailable: false });
     this.sink = options.telemetryPath ? new JsonlSink({ path: options.telemetryPath }) : undefined;
+    this.journal = new Journal(join(this.cwd, ".agent", "sessions", `${this.id}.jsonl`));
   }
 
   /** Files worth indexing, respecting the skip list. */
@@ -292,6 +297,13 @@ export class Session {
     }
 
     const messages = agent.state.messages;
+
+    // Journal every message that landed this turn. Synchronous and append-only
+    // so a kill -9 between turns loses nothing, and one mid-turn loses only the
+    // turn in flight (SPEC 5 Reliability).
+    for (const message of messages.slice(this.journaled)) this.journal.append(message);
+    this.journaled = messages.length;
+
     const assistant = messages.filter((m) => m.role === "assistant");
     const fresh = assistant.slice(this.lastAssistantIndex);
     this.lastAssistantIndex = assistant.length;
@@ -359,6 +371,7 @@ export class Session {
   clear(): void {
     this.agent = undefined;
     this.lastAssistantIndex = 0;
+    this.journaled = 0;
     // A new conversation gets a new task map from its own first prompt.
     this.pinnedContext = undefined;
   }
