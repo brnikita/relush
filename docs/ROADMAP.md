@@ -77,8 +77,12 @@ replacement.
 
 Tasks:
 
-1. ~~**Instrument first.**~~ ✅ Done — `TurnTimer` in `@nodrel/telemetry`. Still
-   to wire into `run-task` output and `eval:ab`.
+1. ~~**Instrument first.**~~ ✅ Done and wired: `run-task` reports
+   provider/tool/harness ms and mean TTFT; `eval:ab` compares each with a
+   significance verdict. First reading, one task on a free model: provider
+   8,744 ms of 8,745 wall, tools 22 ms, harness 0 ms, mean TTFT 2.8 s. **The
+   latency gap is the model's, not the harness's** — which moves task 4
+   (provider selection by measured TTFT) ahead of tasks 2 and 3.
 2. Stream assistant output to the terminal. Pi's `AgentEvent` stream already
    carries deltas; the CLI currently waits for the whole turn.
 3. Enable `toolExecution: "parallel"` where tool calls are independent
@@ -95,21 +99,20 @@ known and ordered by expected value.
 
 | | |
 |---|---|
-| Done | Graph, `graph_query`, cross-file call resolution by unambiguous name, task map (built and tested), 13 languages, retrieval-miss tracking |
-| Missing | Task map not injected; SCIP; Kotlin and Swift; retrieval-miss events not wired to telemetry |
+| Done | Graph, `graph_query`, cross-file call resolution by unambiguous name, 13 languages. **[2026-09-02] ✅ Task map pinned** into the system prompt, budget 1,100 so the §4.1 ceiling holds (invariant test). **✅ Retrieval-miss events** now reach telemetry |
+| Missing | SCIP; Kotlin and Swift |
 | Done means | `eval:ab --suite navigation --seeds 3` reports cost ≤ 50% of baseline, significant |
 | Estimate | 3 weeks |
 
 Tasks:
 
-1. **Inject the task map as pinned context** before the first turn. It is
-   byte-stable and tested; orientation is still paid per turn because it is not
-   wired in. Verify with the prefix-stability test that it does not drift.
+1. ~~**Inject the task map as pinned context**~~ ✅ Done. Computed once from
+   the first prompt, frozen for the session, reset by `/clear`.
 2. **SCIP for TypeScript, Python, Go.** Ambiguous names are deliberately left
    unresolved today; on a real codebase that is most of them. Keep the
    tree-sitter fallback and measure recall on `references` before/after.
-3. Wire `RetrievalTracker` into the session so `retrieval_miss` events land in
-   telemetry, then use the miss rate to tune `graph_query` response format.
+3. ~~Wire `RetrievalTracker` into the session~~ ✅ Done. Next: use the miss
+   rate to tune the `graph_query` response format.
 4. Kotlin and Swift grammars, to reach the 15 the spec requires.
 
 ---
@@ -233,7 +236,10 @@ if a 24 GB machine is available it moves to week 3.
 | 2026-09-02 | Model fallback chain + retry pass in the runner; unattempted runs excluded from solve rate | free models, live |
 | 2026-09-02 | `bash` permission modes with audit log (item 5.1) | free model, live |
 | 2026-09-02 | Secret scanner on outbound prompts (item 6.1) | free model, live |
-| 2026-09-02 | `TurnTimer` latency breakdown (item 2.1, instrument only) | unit tests |
+| 2026-09-02 | `TurnTimer` latency breakdown (item 2.1), wired into `run-task` and `eval:ab` | unit tests |
+| 2026-09-02 | Task map pinned into the system prompt (item 3.1) | unit + invariant tests |
+| 2026-09-02 | Retrieval-miss events wired to telemetry (item 3.3) | unit tests |
+| 2026-09-02 | Free-model A/B on `north-mini-code:free`: tokens −38.1% significant, replicating the GLM result on a second model family; solve-rate delta confounded by model mix (`eval/reports/free-model-ab.md`) | free models, 48 runs |
 
 ## What this plan refuses to do
 

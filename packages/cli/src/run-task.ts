@@ -8,7 +8,7 @@ import { createAgent, createPermissionGuard, resolveModel } from "@nodrel/core";
 import { indexFiles, resolveCrossFileCalls, SqliteGraphStore } from "@nodrel/graph";
 import { createHistoryExtension } from "@nodrel/history";
 import type { StepEvent, TelemetryEvent } from "@nodrel/telemetry";
-import { aggregate } from "@nodrel/telemetry";
+import { aggregate, TurnTimer } from "@nodrel/telemetry";
 
 /**
  * Runs one eval task and reports what it cost (SPEC §4.9).
@@ -68,6 +68,8 @@ export interface TaskRunResult {
   readonly compactionModes: readonly string[];
   /** graph_query calls made, and what they cost. */
   readonly graphQueries: { count: number; tokens: number; results: number };
+  /** Where the wall time went: provider, tools, or the harness itself. */
+  readonly timing: { providerMs: number; toolMs: number; harnessMs: number; meanTtftMs: number };
   /** Model that actually produced the result, after any fallback. */
   readonly modelId: string;
   /** Models that failed with a provider error before this one. */
@@ -219,7 +221,9 @@ async function runTaskOnce(options: TaskRunOptions): Promise<Omit<TaskRunResult,
       : {}),
   });
 
+  const timer = new TurnTimer();
   agent.subscribe((event) => {
+    timer.record(event.type, Date.now());
     if (event.type === "tool_execution_start") {
       toolCalls.push((event as { toolName?: string }).toolName ?? "unknown");
     }
@@ -293,6 +297,15 @@ async function runTaskOnce(options: TaskRunOptions): Promise<Omit<TaskRunResult,
     masked,
     compactionModes: [...modes],
     graphQueries,
+    timing: (() => {
+      const t = timer.summary();
+      return {
+        providerMs: t.providerMs,
+        toolMs: t.toolMs,
+        harnessMs: t.harnessMs,
+        meanTtftMs: Math.round(t.meanTtftMs),
+      };
+    })(),
     modelId: options.modelId,
     ...(error === undefined ? {} : { error }),
   };

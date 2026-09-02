@@ -124,6 +124,9 @@ def _ab(args) -> int:
         ("cost/task", "cost_usd", "$", True),
         ("turns", "turns", "", True),
         ("wall ms", "wall_ms", "", True),
+        ("provider ms", "provider_ms", "", True),
+        ("tool ms", "tool_ms", "", True),
+        ("ttft ms", "ttft_ms", "", True),
     ]
 
     rule = "=" * 104

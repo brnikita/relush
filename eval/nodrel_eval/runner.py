@@ -35,6 +35,10 @@ class TaskResult:
     cost_usd: float
     wall_ms: int
     cache_hit_rate: float
+    provider_ms: int = 0
+    tool_ms: int = 0
+    harness_ms: int = 0
+    ttft_ms: int = 0
     model: str = ""
     fallbacks_from: int = 0
     #: The whole model chain failed with provider errors: nothing was attempted.
@@ -130,6 +134,10 @@ def run_task(
             cost_usd=payload.get("costUsd", 0.0),
             wall_ms=payload.get("wallMs", 0),
             cache_hit_rate=payload.get("cacheHitRate", 0.0),
+            provider_ms=payload.get("timing", {}).get("providerMs", 0),
+            tool_ms=payload.get("timing", {}).get("toolMs", 0),
+            harness_ms=payload.get("timing", {}).get("harnessMs", 0),
+            ttft_ms=payload.get("timing", {}).get("meanTtftMs", 0),
             model=payload.get("modelId", model),
             unattempted=str(payload.get("error", "")).startswith("provider error"),
             fallbacks_from=len(payload.get("fallbacksFrom", [])),
