@@ -35,6 +35,8 @@ class TaskResult:
     cost_usd: float
     wall_ms: int
     cache_hit_rate: float
+    model: str = ""
+    fallbacks_from: int = 0
     graph_queries: int = 0
     graph_query_tokens: int = 0
     masked_count: int = 0
@@ -60,7 +62,12 @@ def _require_entrypoint() -> None:
 
 
 def run_task(
-    task: Task, model: str, seed: int, history: bool = False, graph: bool = False
+    task: Task,
+    model: str,
+    seed: int,
+    history: bool = False,
+    graph: bool = False,
+    fallback: list[str] | None = None,
 ) -> TaskResult:
     """Runs one task end to end and judges it by its verification command."""
     _require_entrypoint()
@@ -85,7 +92,8 @@ def run_task(
                 str(task.timeout_s * 1000),
             ]
             + (["--history"] if history else [])
-            + (["--graph"] if graph else []),
+            + (["--graph"] if graph else [])
+            + (["--fallback", ",".join(fallback)] if fallback else []),
             capture_output=True,
             text=True,
             timeout=task.timeout_s + 60,
@@ -118,6 +126,8 @@ def run_task(
             cost_usd=payload.get("costUsd", 0.0),
             wall_ms=payload.get("wallMs", 0),
             cache_hit_rate=payload.get("cacheHitRate", 0.0),
+            model=payload.get("modelId", model),
+            fallbacks_from=len(payload.get("fallbacksFrom", [])),
             graph_queries=payload.get("graphQueries", {}).get("count", 0),
             graph_query_tokens=payload.get("graphQueries", {}).get("tokens", 0),
             masked_count=payload.get("masked", {}).get("count", 0),
@@ -144,6 +154,7 @@ def run_suite(
     progress=None,
     history: bool = False,
     graph: bool = False,
+    fallback: list[str] | None = None,
 ) -> list[TaskResult]:
     """Runs every task once per seed.
 
@@ -155,7 +166,7 @@ def run_suite(
         for task in tasks:
             if progress:
                 progress(task, seed)
-            results.append(run_task(task, model, seed, history, graph))
+            results.append(run_task(task, model, seed, history, graph, fallback))
     return results
 
 
@@ -215,6 +226,8 @@ def summarize(results: list[TaskResult]) -> dict:
         "cache_hit_rate_sd": sd(per_seed_cache),
         "mean_turns": statistics.fmean([r.turns for r in results]),
         "graph_queries": sum(r.graph_queries for r in results),
+        "fallbacks": sum(r.fallbacks_from for r in results),
+        "models_used": sorted({r.model for r in results if r.model}),
         "masked_outputs": sum(r.masked_count for r in results),
         "masked_tokens_saved": sum(
             r.masked_tokens_before - r.masked_tokens_after for r in results

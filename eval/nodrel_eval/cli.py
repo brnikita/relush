@@ -110,11 +110,13 @@ def _ab(args) -> int:
     log("  control:   baseline harness on %s" % control_model)
     log("  treatment: %s on %s" % (args.treatment, treatment_model))
 
+    fallback = [m for m in (args.fallback or "").split(",") if m]
     log("running control...")
-    control = run_suite(tasks, control_model, args.seeds, progress=_progress)
+    control = run_suite(tasks, control_model, args.seeds, progress=_progress, fallback=fallback)
     log("running treatment...")
     treatment = run_suite(
-        tasks, treatment_model, args.seeds, progress=_progress, history=history, graph=graph
+        tasks, treatment_model, args.seeds, progress=_progress,
+        history=history, graph=graph, fallback=fallback,
     )
 
     metrics = [
@@ -150,6 +152,10 @@ def _ab(args) -> int:
         % (control_solved * 100, treatment_solved * 100, changed)
     )
 
+    fallbacks = sum(r.fallbacks_from for r in control) + sum(r.fallbacks_from for r in treatment)
+    if fallbacks:
+        used = sorted({r.model for r in control + treatment if r.model})
+        print("  fallbacks        %d provider failures rerouted; models used: %s" % (fallbacks, ", ".join(used)))
     graph_queries = sum(r.graph_queries for r in treatment)
     if graph_queries:
         print("  graph queries    %d across the treatment run" % graph_queries)
@@ -192,6 +198,7 @@ def main(argv: list[str] | None = None) -> int:
         help="what to enable on the treatment side",
     )
     p.add_argument("--control-model", default=None, help="model for the control side")
+    p.add_argument("--fallback", default=None, help="comma-separated fallback models, both sides")
     p.add_argument("--treatment-model", default=None, help="model for the treatment side")
 
     p = sub.add_parser("compare")

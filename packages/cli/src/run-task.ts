@@ -40,6 +40,15 @@ export interface TaskRunOptions {
    */
   readonly graph?: boolean;
   readonly maxTokens?: number;
+  /**
+   * Models to try in order if a run ends in a provider error.
+   *
+   * Free models sit in a shared upstream pool and fail unpredictably: in one
+   * probe three of four returned 429 or "service temporarily unavailable"
+   * while the fourth worked. A single-model runner would report those as task
+   * failures and corrupt the solve rate with provider weather.
+   */
+  readonly fallbackModels?: readonly string[];
 }
 
 export interface TaskRunResult {
@@ -57,6 +66,10 @@ export interface TaskRunResult {
   readonly compactionModes: readonly string[];
   /** graph_query calls made, and what they cost. */
   readonly graphQueries: { count: number; tokens: number; results: number };
+  /** Model that actually produced the result, after any fallback. */
+  readonly modelId: string;
+  /** Models that failed with a provider error before this one. */
+  readonly fallbacksFrom: readonly string[];
   readonly error?: string;
 }
 
@@ -100,7 +113,31 @@ interface PiUsage {
  * Errors are captured into the result rather than thrown: a task that fails is
  * a data point the report needs, not an exception that should abort the suite.
  */
+/**
+ * Runs the task, moving down the fallback chain on provider errors.
+ *
+ * Each attempt is a fresh agent on the same working directory. A provider error
+ * on the first turn leaves the directory untouched; one mid-task may leave
+ * partial edits, which the next model then sees -- acceptable, because the
+ * alternative is counting provider weather as a failed task.
+ */
 export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
+  const chain = [options.modelId, ...(options.fallbackModels ?? [])];
+  const fallbacksFrom: string[] = [];
+
+  for (const [index, modelId] of chain.entries()) {
+    const result = await runTaskOnce({ ...options, modelId });
+    const providerFailure = result.error?.startsWith("provider error") === true;
+    const last = index === chain.length - 1;
+
+    if (!providerFailure || last) return { ...result, fallbacksFrom };
+    fallbacksFrom.push(modelId);
+  }
+
+  throw new Error("unreachable: empty model chain");
+}
+
+async function runTaskOnce(options: TaskRunOptions): Promise<Omit<TaskRunResult, "fallbacksFrom">> {
   const sessionId = randomUUID();
   const started = Date.now();
   const toolCalls: string[] = [];
@@ -229,6 +266,7 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
     masked,
     compactionModes: [...modes],
     graphQueries,
+    modelId: options.modelId,
     ...(error === undefined ? {} : { error }),
   };
 }

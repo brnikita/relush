@@ -17,6 +17,7 @@ interface Args {
   history: boolean;
   graph: boolean;
   maxTokens: number | undefined;
+  fallbackModels: string[];
 }
 
 function parseArgs(argv: readonly string[]): Args {
@@ -29,7 +30,7 @@ function parseArgs(argv: readonly string[]): Args {
   const cwd = get("--cwd");
   if (prompt === undefined || cwd === undefined) {
     throw new Error(
-      "usage: nodrel-run-task --prompt <text> --cwd <dir> [--model <id>] [--timeout-ms <n>] [--history] [--graph]",
+      "usage: nodrel-run-task --prompt <text> --cwd <dir> [--model <id>] [--timeout-ms <n>] [--history] [--graph] [--fallback <id,id>]",
     );
   }
 
@@ -41,6 +42,7 @@ function parseArgs(argv: readonly string[]): Args {
     history: argv.includes("--history"),
     graph: argv.includes("--graph"),
     maxTokens: get("--max-tokens") === undefined ? undefined : Number(get("--max-tokens")),
+    fallbackModels: (get("--fallback") ?? "").split(",").filter(Boolean),
   };
 }
 
@@ -68,6 +70,7 @@ async function main(): Promise<number> {
     history: args.history,
     graph: args.graph,
     ...(args.maxTokens === undefined ? {} : { maxTokens: args.maxTokens }),
+    fallbackModels: args.fallbackModels,
   });
 
   process.stdout.write(`${JSON.stringify(result)}\n`);
