@@ -11,7 +11,9 @@ import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import { composeHooks } from "./compose.ts";
 import type { Extension } from "./extensions.ts";
 import { createGraphQueryTool, type GraphToolDeps } from "./graph-tool.ts";
-import { SYSTEM_PROMPT } from "./prompt.ts";
+import { PINNED_INSTRUCTIONS, SYSTEM_PROMPT } from "./prompt.ts";
+
+const NL_ = String.fromCharCode(10);
 
 /**
  * Assembles a runnable agent (SPEC §4.1).
@@ -81,6 +83,12 @@ export interface CreateAgentOptions {
    * have been. 8k is far above any agent turn and keeps the pre-auth honest.
    */
   readonly maxTokens?: number;
+  /**
+   * Pinned context appended to the system prompt: repository conventions and
+   * the task map (SPEC §4.3). Part of the cached prefix, so it must be
+   * byte-stable for the whole session -- compute it once, never per turn.
+   */
+  readonly pinnedContext?: string;
 }
 
 export class ModelNotFoundError extends Error {
@@ -143,7 +151,13 @@ export function createAgent(options: CreateAgentOptions): Agent {
       )) as never,
     getApiKey: () => options.apiKey,
     initialState: {
-      systemPrompt: options.systemPrompt ?? SYSTEM_PROMPT,
+      systemPrompt: [
+        options.systemPrompt ?? SYSTEM_PROMPT,
+        PINNED_INSTRUCTIONS,
+        options.pinnedContext,
+      ]
+        .filter((part): part is string => typeof part === "string" && part !== "")
+        .join(`${NL_}${NL_}`),
       model,
       tools,
     } as never,

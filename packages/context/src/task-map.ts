@@ -25,7 +25,12 @@ export interface TaskMapOptions {
   readonly maxFiles?: number;
 }
 
-export const DEFAULT_TASK_MAP_BUDGET = 1500;
+/**
+ * Sized so that prompt + tools + pinned instructions + task map stays under the
+ * SPEC §4.1 fixed-overhead ceiling of 2,000 tokens. The constant parts measure
+ * 841, so 1,100 leaves ~60 tokens of slack rather than none.
+ */
+export const DEFAULT_TASK_MAP_BUDGET = 1100;
 
 /** Words worth matching on. Short tokens match everything and rank nothing. */
 const termsOf = (prompt: string): string[] =>

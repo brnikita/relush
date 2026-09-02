@@ -1,4 +1,5 @@
 import { countTextTokens, estimateToolTokens, FLASH } from "@nodrel/ai";
+import { DEFAULT_TASK_MAP_BUDGET } from "@nodrel/context";
 import { CORE_TOOLS, PINNED_INSTRUCTIONS, SYSTEM_PROMPT } from "@nodrel/core";
 import { breakEvenTokens, CACHE_RATE_RATIO } from "@nodrel/history";
 import { ESCALATION_TOKEN_LIMIT, Router } from "@nodrel/router";
@@ -21,6 +22,18 @@ describe("fixed overhead (SPEC §4.1)", () => {
       countTextTokens(PINNED_INSTRUCTIONS);
 
     expect(overhead, `fixed overhead is ${overhead} tokens`).toBeLessThanOrEqual(2000);
+  });
+
+  it("stays under 2,000 tokens even with a full task map pinned", () => {
+    // The task map lives in the system prompt (SPEC 4.3), so its budget counts
+    // against the same ceiling. A map budget that ignores this would let the
+    // pinned prefix quietly exceed 4.1 on any large repository.
+    const constant =
+      countTextTokens(SYSTEM_PROMPT) +
+      CORE_TOOLS.reduce((sum, tool) => sum + estimateToolTokens(tool), 0) +
+      countTextTokens(PINNED_INSTRUCTIONS);
+
+    expect(constant + DEFAULT_TASK_MAP_BUDGET).toBeLessThanOrEqual(2000);
   });
 
   it("ships exactly five core tools", () => {

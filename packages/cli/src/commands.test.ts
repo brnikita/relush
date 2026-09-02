@@ -202,3 +202,28 @@ describe("escalation end to end", () => {
     expect((await run("/cost")).output).toMatch(/15% limit/);
   });
 });
+
+describe("pinned task map", () => {
+  it("counts toward the fixed-overhead ceiling with the constant parts", async () => {
+    // SPEC 4.1: the task map lives in the system prompt, so its budget plus the
+    // constant parts must stay under 2,000 tokens on any repository.
+    const { countTextTokens, estimateToolTokens } = await import("@nodrel/ai");
+    const { CORE_TOOLS, PINNED_INSTRUCTIONS, SYSTEM_PROMPT } = await import("@nodrel/core");
+    const { DEFAULT_TASK_MAP_BUDGET } = await import("@nodrel/context");
+
+    const constant =
+      countTextTokens(SYSTEM_PROMPT) +
+      CORE_TOOLS.reduce((s, t) => s + estimateToolTokens(t), 0) +
+      countTextTokens(PINNED_INSTRUCTIONS);
+
+    expect(constant + DEFAULT_TASK_MAP_BUDGET).toBeLessThanOrEqual(2000);
+  });
+
+  it("produces the same map text for the same prompt, so the prefix is stable", () => {
+    const a = session.taskMap("format money");
+    const b = session.taskMap("format money");
+
+    expect(a).toBe(b);
+    expect(a).toContain("formatMoney");
+  });
+});

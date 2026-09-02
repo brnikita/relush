@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { findModel } from "@nodrel/ai";
+import { countTextTokens, findModel } from "@nodrel/ai";
+import { buildTaskMap } from "@nodrel/context";
 import type { Extension } from "@nodrel/core";
 import { createAgent, createPermissionGuard, resolveModel } from "@nodrel/core";
 import { indexFiles, resolveCrossFileCalls, SqliteGraphStore } from "@nodrel/graph";
@@ -195,6 +196,15 @@ async function runTaskOnce(options: TaskRunOptions): Promise<Omit<TaskRunResult,
     sessionId,
     extensions,
     ...(options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
+    ...(graph
+      ? {
+          pinnedContext: buildTaskMap({
+            store: graph,
+            countTokens: countTextTokens,
+            prompt: options.prompt,
+          }).text,
+        }
+      : {}),
     ...(graph
       ? {
           graph: {

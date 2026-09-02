@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { countTextTokens, findModel } from "@nodrel/ai";
-import { buildTaskMap } from "@nodrel/context";
+import { buildTaskMap, RetrievalTracker } from "@nodrel/context";
 import type { Extension, PermissionMode } from "@nodrel/core";
 import { createAgent, createPermissionGuard, createSecretScanner } from "@nodrel/core";
 import type { GraphStore } from "@nodrel/graph";
@@ -11,7 +11,7 @@ import type { ContentCache } from "@nodrel/history";
 import { createHistoryExtension, expand as expandCached } from "@nodrel/history";
 import type { LayerPin } from "@nodrel/router";
 import { Router } from "@nodrel/router";
-import type { StepEvent } from "@nodrel/telemetry";
+import type { RetrievalMissEvent, StepEvent } from "@nodrel/telemetry";
 import { JsonlSink } from "@nodrel/telemetry";
 
 /**
@@ -74,6 +74,11 @@ export class Session {
   private store: GraphStore | undefined;
   private cache: ContentCache | undefined;
   private lastAssistantIndex = 0;
+  /** Task map computed from the first prompt and frozen for the session. */
+  private pinnedContext: string | undefined;
+  /** Detects whole-file reads that a graph query already covered (SPEC §4.3). */
+  private readonly retrieval = new RetrievalTracker();
+  private queryCounter = 0;
 
   constructor(options: SessionOptions) {
     this.options = options;
@@ -125,10 +130,22 @@ export class Session {
   }
 
   /** Builds the agent lazily, so `--print` with no prompt costs nothing. */
-  private async ensureAgent(): Promise<ReturnType<typeof createAgent>> {
+  private async ensureAgent(firstPrompt?: string): Promise<ReturnType<typeof createAgent>> {
     if (this.agent) return this.agent;
 
     if (this.options.graph && !this.store) await this.index();
+
+    // The task map is built once, from the first prompt, and lives in the
+    // system prompt for the rest of the session. Rebuilding it per turn would
+    // change the cached prefix on every request (SPEC §4.4), which is the
+    // failure the history manager exists to avoid.
+    if (this.store && firstPrompt !== undefined && this.pinnedContext === undefined) {
+      this.pinnedContext = buildTaskMap({
+        store: this.store,
+        countTokens: countTextTokens,
+        prompt: firstPrompt,
+      }).text;
+    }
 
     const extensions: Extension[] = [];
 
@@ -185,7 +202,51 @@ export class Session {
       cwd: this.cwd,
       sessionId: this.id,
       extensions,
-      ...(this.store ? { graph: { store: this.store } } : {}),
+      ...(this.store
+        ? {
+            graph: {
+              store: this.store,
+              onQuery: (event) => {
+                this.queryCounter += 1;
+                this.retrieval.recordQuery(
+                  `q${this.queryCounter}`,
+                  event.op,
+                  event.paths,
+                  event.tokens,
+                );
+              },
+            },
+          }
+        : {}),
+      ...(this.pinnedContext === undefined ? {} : { pinnedContext: this.pinnedContext }),
+    });
+
+    // A `read` after a covering `graph_query` is a retrieval miss: the graph
+    // answered, the model did not trust it, and the tokens were spent twice.
+    // This is the tuning signal for the context engine.
+    this.agent.subscribe((event) => {
+      if (event.type === "turn_end") this.retrieval.nextTurn();
+      if (event.type !== "tool_execution_end") return;
+      const e = event as {
+        toolName?: string;
+        args?: { path?: string };
+        result?: { content?: { text?: string }[] };
+      };
+      if (e.toolName !== "read" || typeof e.args?.path !== "string") return;
+      const text = (e.result?.content ?? []).map((p) => p.text ?? "").join("");
+      const path = e.args.path.split("\\").join("/").replace(/^\.\//, "");
+      const miss = this.retrieval.recordRead(path, countTextTokens(text));
+      if (miss && this.sink) {
+        const record: RetrievalMissEvent = {
+          type: "retrieval_miss",
+          ts: new Date().toISOString(),
+          sessionId: this.id,
+          queryId: miss.queryId,
+          path: miss.path,
+          wastedTokens: miss.wastedTokens,
+        };
+        this.sink.record(record);
+      }
     });
 
     return this.agent;
@@ -193,7 +254,7 @@ export class Session {
 
   /** Runs one turn and reports what it cost. */
   async prompt(text: string): Promise<TurnResult> {
-    const agent = await this.ensureAgent();
+    const agent = await this.ensureAgent(text);
     const decision = this.router.route({ prompt: text });
 
     const toolCalls: string[] = [];
@@ -277,6 +338,8 @@ export class Session {
   clear(): void {
     this.agent = undefined;
     this.lastAssistantIndex = 0;
+    // A new conversation gets a new task map from its own first prompt.
+    this.pinnedContext = undefined;
   }
 
   /** `/expand <id>` — retrieves compacted content. */
@@ -287,6 +350,11 @@ export class Session {
     } catch {
       return `no cached content for id ${id}`;
     }
+  }
+
+  /** Share of graph queries followed by a redundant read. */
+  get retrievalMissRate(): number {
+    return this.retrieval.missRate;
   }
 
   setPin(pin: LayerPin): void {
