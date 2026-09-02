@@ -37,6 +37,10 @@ class TaskResult:
     cache_hit_rate: float
     model: str = ""
     fallbacks_from: int = 0
+    #: The whole model chain failed with provider errors: nothing was attempted.
+    #: These are provider weather, not task outcomes, and are excluded from
+    #: solve rate rather than counted as failures.
+    unattempted: bool = False
     graph_queries: int = 0
     graph_query_tokens: int = 0
     masked_count: int = 0
@@ -127,6 +131,7 @@ def run_task(
             wall_ms=payload.get("wallMs", 0),
             cache_hit_rate=payload.get("cacheHitRate", 0.0),
             model=payload.get("modelId", model),
+            unattempted=str(payload.get("error", "")).startswith("provider error"),
             fallbacks_from=len(payload.get("fallbacksFrom", [])),
             graph_queries=payload.get("graphQueries", {}).get("count", 0),
             graph_query_tokens=payload.get("graphQueries", {}).get("tokens", 0),
@@ -179,8 +184,11 @@ def summarize(results: list[TaskResult]) -> dict:
             "cache_hit_rate": 0.0, "mean_turns": 0.0,
         }
 
+    unattempted = [r for r in results if r.unattempted]
+    attempted = [r for r in results if not r.unattempted]
+
     by_seed: dict[int, list[TaskResult]] = {}
-    for r in results:
+    for r in attempted:
         by_seed.setdefault(r.seed, []).append(r)
 
     per_seed_solve = [
@@ -211,6 +219,7 @@ def summarize(results: list[TaskResult]) -> dict:
     return {
         "tasks": len({r.task_id for r in results}),
         "runs": len(results),
+        "unattempted": len(unattempted),
         "seeds": len(by_seed),
         "solve_rate": statistics.fmean(per_seed_solve) if per_seed_solve else 0.0,
         # Reported alongside the mean because a single seed hides variance, and

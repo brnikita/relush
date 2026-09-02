@@ -135,16 +135,23 @@ def _ab(args) -> int:
     )
     print(rule)
 
+    c_att = [r for r in control if not r.unattempted]
+    t_att = [r for r in treatment if not r.unattempted]
     comparisons = []
     for label, attribute, unit, lower_better in metrics:
-        comparison = welch(label, per_seed(control, attribute), per_seed(treatment, attribute))
+        comparison = welch(label, per_seed(c_att, attribute), per_seed(t_att, attribute))
         comparisons.append(comparison)
         print(format_comparison(comparison, unit, lower_better))
 
     # Solve rate is the guard: a cheaper run that solves less is not an
     # improvement, so it is reported whether or not it moved.
-    control_solved = sum(1 for r in control if r.solved) / max(1, len(control))
-    treatment_solved = sum(1 for r in treatment if r.solved) / max(1, len(treatment))
+    # Solve rate over attempted runs only. A run where every model in the chain
+    # returned a provider error says nothing about the task.
+    control_solved = sum(1 for r in c_att if r.solved) / max(1, len(c_att))
+    treatment_solved = sum(1 for r in t_att if r.solved) / max(1, len(t_att))
+    dropped = (len(control) - len(c_att)) + (len(treatment) - len(t_att))
+    if dropped:
+        print("  unattempted      %d run(s) hit provider errors on every model and are excluded" % dropped)
     changed = "unchanged" if control_solved == treatment_solved else "CHANGED"
     print("")
     print(

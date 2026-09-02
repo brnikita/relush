@@ -31,6 +31,8 @@ export type {
 export { cacheHitRate, inputTokens, LAYERS, totalTokens } from "./events.ts";
 export type { ReadResult, SinkOptions, TelemetryMode } from "./sink.ts";
 export { JsonlSink, parseMode, readEvents } from "./sink.ts";
+export type { TimingSummary, TurnTiming } from "./timing.ts";
+export { TurnTimer } from "./timing.ts";
 export type { Validated, ValidationFailure, ValidationSuccess } from "./validate.ts";
 export { validateEvent } from "./validate.ts";
 
