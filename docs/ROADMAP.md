@@ -1,8 +1,12 @@
 # Roadmap: from prototype to product
 
 - Date: 2026-09-02; progress marked 2026-09-02 (free-model pass)
-- Status of the codebase this plans from: 43 commits, 372 tests, P0–P3 done,
-  P4 partial, P5 not started. Measured position in `eval/reports/verdict.md`.
+- Status when written: 43 commits, 372 tests, P0–P3 done, P4 partial, P5 not
+  started. Measured position in `eval/reports/verdict.md`.
+- **Status after the free-model pass (2026-09-02): 55 commits, 441 tests, CI
+  green.** Seven items done and verified live on free models; see the progress
+  log at the end. What remains needs either credits (item 1), hardware (item 4),
+  or a TUI (item 5) — none of which a free model can supply.
 
 Ordered by expected effect on competitive advantage, not by the phase numbers
 in `SPEC.md`. Each item states what is done, what is missing, what "done" looks
