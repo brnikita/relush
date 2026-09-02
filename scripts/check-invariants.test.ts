@@ -33,7 +33,8 @@ describe("fixed overhead (SPEC §4.1)", () => {
       CORE_TOOLS.reduce((sum, tool) => sum + estimateToolTokens(tool), 0) +
       countTextTokens(PINNED_INSTRUCTIONS);
 
-    expect(constant + DEFAULT_TASK_MAP_BUDGET).toBeLessThanOrEqual(2000);
+    // 400 is the imported-rules share set in Session.
+    expect(constant + DEFAULT_TASK_MAP_BUDGET + 400).toBeLessThanOrEqual(2000);
   });
 
   it("ships exactly five core tools", () => {

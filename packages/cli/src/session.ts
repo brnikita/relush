@@ -13,6 +13,7 @@ import type { LayerPin } from "@nodrel/router";
 import { Router } from "@nodrel/router";
 import type { RetrievalMissEvent, StepEvent } from "@nodrel/telemetry";
 import { JsonlSink } from "@nodrel/telemetry";
+import { importRules } from "./import-config.ts";
 
 /**
  * A `nodrel` session: the agent plus everything that makes it cheap.
@@ -78,6 +79,8 @@ export class Session {
   private pinnedContext: string | undefined;
   /** Detects whole-file reads that a graph query already covered (SPEC §4.3). */
   private readonly retrieval = new RetrievalTracker();
+  /** Rule files imported on first turn, for the user's information. */
+  importedRules: readonly string[] = [];
   private queryCounter = 0;
 
   constructor(options: SessionOptions) {
@@ -139,12 +142,30 @@ export class Session {
     // system prompt for the rest of the session. Rebuilding it per turn would
     // change the cached prefix on every request (SPEC §4.4), which is the
     // failure the history manager exists to avoid.
-    if (this.store && firstPrompt !== undefined && this.pinnedContext === undefined) {
-      this.pinnedContext = buildTaskMap({
-        store: this.store,
-        countTokens: countTextTokens,
-        prompt: firstPrompt,
-      }).text;
+    if (firstPrompt !== undefined && this.pinnedContext === undefined) {
+      const parts: string[] = [];
+      // Imported rules go first: they are the user's standing instructions and
+      // the most stable part of the prefix.
+      const rules = importRules(this.cwd, countTextTokens);
+      // The pinned prefix has a fixed 2,000-token ceiling (SPEC 4.1) shared by
+      // the prompt, tools, task map and these rules. Rules beyond their share
+      // are truncated with a note rather than silently breaking the ceiling.
+      const RULES_BUDGET = 400;
+      if (rules.text !== "") {
+        parts.push(
+          rules.tokensEstimate <= RULES_BUDGET
+            ? rules.text
+            : `${rules.text.slice(0, RULES_BUDGET * 3)}${NL_}[imported rules truncated to fit the prefix budget]`,
+        );
+      }
+      if (this.store) {
+        parts.push(
+          buildTaskMap({ store: this.store, countTokens: countTextTokens, prompt: firstPrompt })
+            .text,
+        );
+      }
+      this.pinnedContext = parts.join(`${NL_}${NL_}`);
+      this.importedRules = rules.sources.map((s) => s.path);
     }
 
     const extensions: Extension[] = [];

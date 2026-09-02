@@ -7,6 +7,8 @@ export type { Command, CommandContext, CommandResult } from "./commands.ts";
 export { COMMANDS, isCommand, runCommand } from "./commands.ts";
 export type { CostReportOptions } from "./cost.ts";
 export { costReport } from "./cost.ts";
+export type { ImportedRules } from "./import-config.ts";
+export { importRules } from "./import-config.ts";
 export type { SessionOptions, TurnResult } from "./session.ts";
 export { Session } from "./session.ts";
 

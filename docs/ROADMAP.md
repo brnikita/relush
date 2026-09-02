@@ -152,7 +152,7 @@ user who is not the author.
 | | |
 |---|---|
 | Done | Interactive, `--print`, `--json`; full slash-command set; per-turn cost line. **[2026-09-02] ✅ `bash` permission modes** — `allowlist` / `confirm` / `yolo` with a deny list that wins in every mode, an append-only audit log at `.agent/audit.jsonl`, `--permissions` flag; defaults to `confirm` on a TTY and `allowlist` when piped (27 tests, verified live) |
-| Missing | Streaming TUI, tool-call display, layer badge; session resume; `--rpc`; SDK entry point; config import from `.claude/` / `.cursor/` / `.codex/` |
+| Missing | Streaming TUI, tool-call display, layer badge; session resume; `--rpc`; SDK entry point. **[2026-09-02] ✅ Config import** from `CLAUDE.md`, `.claude/rules/`, `.cursorrules`, `.cursor/rules/`, `AGENTS.md`, `.clinerules` — read-only, deduplicated by content, capped at 400 tokens of the pinned prefix (9 tests, verified live) |
 | Done means | A user who has used Claude Code can sit down at `nodrel` and not notice a missing capability in a day's work |
 | Estimate | 3 weeks |
 
@@ -165,8 +165,8 @@ Tasks, in order of risk:
    they start and finish, the `[layer]` badge per step.
 3. Session persistence and `--resume`: Pi's JSONL session tree, plus the
    `layer`/`cost` fields SPEC §4.1 adds to each record.
-4. Read-only import of rules and skills from `.claude/`, `.cursor/`, `.codex/`,
-   `.cline/` on first run.
+4. ~~Read-only import of rules~~ ✅ Done. Verified live: a rule in `CLAUDE.md`
+   was followed without appearing in the prompt. Skills are not imported yet.
 5. `--rpc` (JSON-RPC over stdio) and an importable SDK, for editor integration.
 
 ---
@@ -239,6 +239,7 @@ if a 24 GB machine is available it moves to week 3.
 | 2026-09-02 | `TurnTimer` latency breakdown (item 2.1), wired into `run-task` and `eval:ab` | unit tests |
 | 2026-09-02 | Task map pinned into the system prompt (item 3.1) | unit + invariant tests |
 | 2026-09-02 | Retrieval-miss events wired to telemetry (item 3.3) | unit tests |
+| 2026-09-02 | Config import from other agents' rule files (item 5.4) | free model, live |
 | 2026-09-02 | Free-model A/B on `north-mini-code:free`: tokens −38.1% significant, replicating the GLM result on a second model family; solve-rate delta confounded by model mix (`eval/reports/free-model-ab.md`) | free models, 48 runs |
 
 ## What this plan refuses to do
