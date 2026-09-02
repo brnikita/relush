@@ -1,6 +1,6 @@
 # Roadmap: from prototype to product
 
-- Date: 2026-09-02
+- Date: 2026-09-02; progress marked 2026-09-02 (free-model pass)
 - Status of the codebase this plans from: 43 commits, 372 tests, P0–P3 done,
   P4 partial, P5 not started. Measured position in `eval/reports/verdict.md`.
 
@@ -32,8 +32,8 @@ optimizing a product that does not work, and the plan should stop there.
 
 | | |
 |---|---|
-| Done | Eval harness with verification-by-execution, `eval:ab` with Welch's t-test, 21 tasks across 4 suites, M0 baseline frozen, `--control-model`/`--treatment-model` flags |
-| Missing | SWE-bench Verified-50 (needs per-task Docker images), Terminal-Bench subset, a real pinned corpus for `bench:graph`, credits for ≥ 24 expensive-model runs |
+| Done | Eval harness with verification-by-execution, `eval:ab` with Welch's t-test, 21 tasks across 4 suites, M0 baseline frozen, `--control-model`/`--treatment-model` flags. **[2026-09-02]** `--fallback` model chain with a retry pass; runs where every model errors are marked *unattempted* and excluded from solve rate rather than counted as failures |
+| Missing | SWE-bench Verified-50 (needs per-task Docker images), Terminal-Bench subset, a real pinned corpus for `bench:graph`, credits for ≥ 24 expensive-model runs. **Blocked on credits**: the account is at $90.00/$90 |
 | Done means | `eval:ab --suite swebench --control-model anthropic/claude-sonnet-5 --treatment graph --seeds 3` reports solve rate, cost and wall time with significance verdicts, and the result is committed to `eval/reports/` whatever it says |
 | Depends on | OpenRouter credits (account is exhausted at $90.00/$90); Docker (installed); ~40 GB disk for images |
 | Estimate | 2 weeks |
@@ -47,6 +47,12 @@ Tasks:
 3. Add ≥ 10 `longhorizon` tasks that reach 30+ turns, so the history manager is
    exercised on something realistic.
 4. Run the head-to-head at ≥ 24 runs per side and commit the report.
+
+Free-model note (2026-09-02): the first free A/B was unusable — 109
+fallbacks over 48 runs, 15 logged, solve rate collapsing on both sides — because
+the shared pool was saturated. That is what motivated the `unattempted` marking
+and the retry pass. Free models can validate the *mechanics* here; they cannot
+answer the thesis, because the expensive side is paid by definition.
 
 **Exit criterion for the whole roadmap:** solve rate within 5 pp of the
 expensive model at ≤ 25% of its cost on SWE-bench-50. If that fails, revisit
@@ -63,17 +69,16 @@ replacement.
 
 | | |
 |---|---|
-| Done | Per-turn cost line; wall time recorded per task |
-| Missing | Any diagnosis of where the time goes; streaming; parallel tool execution |
+| Done | Per-turn cost line; wall time recorded per task. **[2026-09-02] ✅ `TurnTimer`**: splits each turn into TTFT / provider round trip / tool time with the remainder attributed to the harness (7 tests) |
+| Missing | Wiring the timer into the runner output; streaming; parallel tool execution; the measurement itself |
 | Done means | Median wall time per `navigation` task within 1.3× of the expensive model, measured at ≥ 3 seeds |
 | Depends on | Item 1's harness for the measurement |
 | Estimate | 1–2 weeks |
 
 Tasks:
 
-1. **Instrument first.** Record per-turn provider latency (TTFT and total)
-   separately from tool execution time. The current data cannot say whether the
-   gap is the model, the turn count, or the harness.
+1. ~~**Instrument first.**~~ ✅ Done — `TurnTimer` in `@nodrel/telemetry`. Still
+   to wire into `run-task` output and `eval:ab`.
 2. Stream assistant output to the terminal. Pi's `AgentEvent` stream already
    carries deltas; the CLI currently waits for the whole turn.
 3. Enable `toolExecution: "parallel"` where tool calls are independent
@@ -143,15 +148,16 @@ user who is not the author.
 
 | | |
 |---|---|
-| Done | Interactive, `--print`, `--json`; full slash-command set; per-turn cost line |
-| Missing | Streaming TUI, tool-call display, layer badge; **`bash` permission modes**; session resume; `--rpc`; SDK entry point; config import from `.claude/` / `.cursor/` / `.codex/` |
+| Done | Interactive, `--print`, `--json`; full slash-command set; per-turn cost line. **[2026-09-02] ✅ `bash` permission modes** — `allowlist` / `confirm` / `yolo` with a deny list that wins in every mode, an append-only audit log at `.agent/audit.jsonl`, `--permissions` flag; defaults to `confirm` on a TTY and `allowlist` when piped (27 tests, verified live) |
+| Missing | Streaming TUI, tool-call display, layer badge; session resume; `--rpc`; SDK entry point; config import from `.claude/` / `.cursor/` / `.codex/` |
 | Done means | A user who has used Claude Code can sit down at `nodrel` and not notice a missing capability in a day's work |
 | Estimate | 3 weeks |
 
 Tasks, in order of risk:
 
-1. **`bash` permission modes** — allow-list, confirm, and yolo — with a tool-call
-   audit log. This is safety, not polish; ship it before any external user.
+1. ~~**`bash` permission modes**~~ ✅ Done. Verified live: a free model told to
+   `rm -rf a.js` was blocked, the file survived, both decisions are in the audit
+   log.
 2. Streaming TUI on `@earendil-works/pi-tui`: assistant deltas, tool calls as
    they start and finish, the `[layer]` badge per step.
 3. Session persistence and `--resume`: Pi's JSONL session tree, plus the
@@ -168,15 +174,18 @@ Tasks, in order of risk:
 
 | | |
 |---|---|
-| Done | No native dependencies (WASM parsing, `node:sqlite`) — builds anywhere without a C++ toolchain |
-| Missing | Installer, binaries, secret scanner, BYOK keychain, offline mode, crash recovery, gateway client |
+| Done | No native dependencies (WASM parsing, `node:sqlite`) — builds anywhere without a C++ toolchain. **[2026-09-02] ✅ Secret scanner** — 12 gitleaks-shaped rules, runs as the last history stage on every role including tool results, typed placeholders, redactions in the audit log (18 tests, verified live) |
+| Missing | Installer, binaries, BYOK keychain, offline mode, crash recovery, gateway client |
 | Done means | `curl -fsSL <domain> \| sh` produces a working binary on macOS-arm64 and linux-x64 CI runners; a session survives `kill -9` mid-tool-call; no API key ever appears in an outbound prompt |
 | Estimate | 3 weeks |
 
 Tasks:
 
-1. **Secret scanner** (gitleaks rules) on every outbound prompt, redacting and
-   logging matches. Do this before item 5's external users, not after.
+1. ~~**Secret scanner**~~ ✅ Done. Verified live: the model was told to `cat
+   .env` and report the key; what reached it was
+   `OPENROUTER_API_KEY=[REDACTED:openrouter-key]`. GitHub push protection
+   flagged a test fixture as a real token on first push — fixtures are now
+   assembled from parts.
 2. Crash-safe session state: resume after `kill -9` during a tool call.
 3. BYOK via OS keychain for OpenRouter / Anthropic / OpenAI keys.
 4. Installer and per-platform binaries; `scripts/install-e2e.sh` on CI.
@@ -216,6 +225,15 @@ week 16     item 7  — economics
 
 Item 4 is placed late only because it needs hardware the project does not have;
 if a 24 GB machine is available it moves to week 3.
+
+## Progress log
+
+| date | done | verified on |
+|---|---|---|
+| 2026-09-02 | Model fallback chain + retry pass in the runner; unattempted runs excluded from solve rate | free models, live |
+| 2026-09-02 | `bash` permission modes with audit log (item 5.1) | free model, live |
+| 2026-09-02 | Secret scanner on outbound prompts (item 6.1) | free model, live |
+| 2026-09-02 | `TurnTimer` latency breakdown (item 2.1, instrument only) | unit tests |
 
 ## What this plan refuses to do
 
