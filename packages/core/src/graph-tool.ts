@@ -18,6 +18,7 @@ export interface GraphToolDeps {
     tokens: number;
     results: number;
     truncated: number;
+    paths: readonly string[];
   }) => void;
 }
 

@@ -1,5 +1,6 @@
 import type { GraphStore } from "@nodrel/graph";
 import { type GraphOperation, graphQuery } from "./query.ts";
+import { pathsInResponse } from "./retrieval-miss.ts";
 
 /**
  * `graph_query` as an agent tool (SPEC §4.1, §4.3).
@@ -20,6 +21,8 @@ export interface GraphToolOptions {
     tokens: number;
     results: number;
     truncated: number;
+    /** Files the response referred to, for retrieval-miss tracking. */
+    paths: readonly string[];
   }) => void;
 }
 
@@ -88,6 +91,7 @@ export function executeGraphQuery(
     tokens: response.tokens,
     results: response.totalResults,
     truncated: response.truncated.length,
+    paths: pathsInResponse(response.text),
   });
 
   return { content: [{ type: "text", text: response.text }], isError: false };
