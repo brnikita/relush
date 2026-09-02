@@ -163,6 +163,13 @@ def _ab(args) -> int:
     if fallbacks:
         used = sorted({r.model for r in control + treatment if r.model})
         print("  fallbacks        %d provider failures rerouted; models used: %s" % (fallbacks, ", ".join(used)))
+        # If the model mix differs between sides, the comparison is between two
+        # weather patterns, not two harness configurations. Say so.
+        c_mix = {r.model for r in control if r.model}
+        t_mix = {r.model for r in treatment if r.model}
+        if c_mix != t_mix or len(used) > 1:
+            print("  CAVEAT           sides ran on different model mixes; treat every verdict")
+            print("                   above as provider-confounded, not a harness effect")
     graph_queries = sum(r.graph_queries for r in treatment)
     if graph_queries:
         print("  graph queries    %d across the treatment run" % graph_queries)
