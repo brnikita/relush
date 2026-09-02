@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { countTextTokens, findModel } from "@nodrel/ai";
 import { buildTaskMap } from "@nodrel/context";
-import type { Extension } from "@nodrel/core";
-import { createAgent } from "@nodrel/core";
+import type { Extension, PermissionMode } from "@nodrel/core";
+import { createAgent, createPermissionGuard, createSecretScanner } from "@nodrel/core";
 import type { GraphStore } from "@nodrel/graph";
 import { indexFiles, resolveCrossFileCalls, SqliteGraphStore } from "@nodrel/graph";
 import type { ContentCache } from "@nodrel/history";
@@ -32,6 +32,14 @@ export interface SessionOptions {
   readonly history?: boolean;
   readonly telemetryPath?: string;
   readonly sessionId?: string;
+  /**
+   * Permission mode for `bash`. Defaults to `allowlist`: the safe choice for
+   * anyone who is not the author, and the one an eval harness overrides
+   * explicitly with `yolo`.
+   */
+  readonly permissions?: PermissionMode;
+  /** Asked in `confirm` mode. */
+  readonly confirm?: (command: string) => Promise<boolean>;
 }
 
 export interface TurnResult {
@@ -50,6 +58,7 @@ interface PiUsage {
 }
 
 const DEFAULT_MODEL = "z-ai/glm-5.3-flash";
+const NL_ = String.fromCharCode(10);
 
 /** Directories never worth indexing. */
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "target", "vendor", ".git"]);
@@ -122,6 +131,25 @@ export class Session {
     if (this.options.graph && !this.store) await this.index();
 
     const extensions: Extension[] = [];
+
+    // Permissions attach first so no other stage sees a blocked call. The
+    // audit log is append-only JSONL beside the telemetry, for the same
+    // crash-safety reasons.
+    const auditPath = join(this.cwd, ".agent", "audit.jsonl");
+    extensions.push({
+      name: "permissions",
+      toolGuards: [
+        createPermissionGuard({
+          mode: this.options.permissions ?? "allowlist",
+          ...(this.options.confirm === undefined ? {} : { confirm: this.options.confirm }),
+          onDecision: (entry) => {
+            mkdirSync(dirname(auditPath), { recursive: true });
+            appendFileSync(auditPath, `${JSON.stringify(entry)}${NL_}`, "utf8");
+          },
+        }),
+      ],
+    });
+
     if (this.options.history) {
       const windowTokens = findModel(this.modelId)?.contextLength ?? 128_000;
       const extension = createHistoryExtension({
@@ -132,6 +160,24 @@ export class Session {
       this.cache = extension.cache;
       extensions.push(extension as unknown as Extension);
     }
+
+    // The scanner goes last so it sees the transcript as it will be sent,
+    // after compaction has assembled it. Redactions land in the audit log.
+    extensions.push({
+      name: "secrets",
+      historyStages: [
+        createSecretScanner({
+          onRedaction: (event) => {
+            mkdirSync(dirname(auditPath), { recursive: true });
+            appendFileSync(
+              auditPath,
+              `${JSON.stringify({ ts: new Date().toISOString(), tool: "prompt", verdict: "redacted", ...event })}${NL_}`,
+              "utf8",
+            );
+          },
+        }),
+      ],
+    });
 
     this.agent = createAgent({
       modelId: this.modelId,

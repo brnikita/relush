@@ -19,6 +19,7 @@ interface Options {
   readonly model: string | undefined;
   readonly graph: boolean;
   readonly history: boolean;
+  readonly permissions: "allowlist" | "confirm" | "yolo";
   readonly help: boolean;
   readonly version: boolean;
 }
@@ -39,6 +40,7 @@ Options:
   -m, --model <id>       Model id (default: z-ai/glm-5.3-flash)
       --no-graph         Disable the code graph (on by default)
       --history          Enable batched history compaction
+      --permissions <m>  bash policy: allowlist (default) | confirm | yolo
   -h, --help             Show this message
   -v, --version          Show the version
 
@@ -69,6 +71,9 @@ function parseArgs(argv: readonly string[]): Options {
     // The graph is the point of the tool, so it is on unless refused.
     graph: !has("--no-graph"),
     history: has("--history"),
+    permissions:
+      (["allowlist", "confirm", "yolo"] as const).find((m) => m === value("--permissions")) ??
+      (process.stdin.isTTY ? "confirm" : "allowlist"),
     help: has("-h", "--help"),
     version: has("-v", "--version"),
   };
@@ -102,6 +107,16 @@ async function main(): Promise<number> {
     graph: options.graph,
     history: options.history,
     telemetryPath,
+    permissions: options.permissions,
+    // Interactive sessions can ask; piped and --print ones cannot, so they
+    // fall back to the allow-list rather than silently running everything.
+    confirm: async (command) => {
+      if (!process.stdin.isTTY) return false;
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const answer = (await rl.question(`  run \`${command}\`? [y/N] `)).trim().toLowerCase();
+      rl.close();
+      return answer === "y" || answer === "yes";
+    },
   });
 
   try {

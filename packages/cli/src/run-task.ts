@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { findModel } from "@nodrel/ai";
-import { createAgent, resolveModel } from "@nodrel/core";
+import type { Extension } from "@nodrel/core";
+import { createAgent, createPermissionGuard, resolveModel } from "@nodrel/core";
 import { indexFiles, resolveCrossFileCalls, SqliteGraphStore } from "@nodrel/graph";
 import { createHistoryExtension } from "@nodrel/history";
 import type { StepEvent, TelemetryEvent } from "@nodrel/telemetry";
@@ -125,16 +126,25 @@ export async function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
   const chain = [options.modelId, ...(options.fallbackModels ?? [])];
   const fallbacksFrom: string[] = [];
 
-  for (const [index, modelId] of chain.entries()) {
-    const result = await runTaskOnce({ ...options, modelId });
-    const providerFailure = result.error?.startsWith("provider error") === true;
-    const last = index === chain.length - 1;
+  // Two passes over the chain with a pause between. Free-pool 429s clear on
+  // a timescale of tens of seconds, so a chain that failed end to end at t=0
+  // often has a working model at t=30s -- and one pause is far cheaper than
+  // discarding the run.
+  const passes = options.fallbackModels?.length ? 2 : 1;
+  let result: Omit<TaskRunResult, "fallbacksFrom"> | undefined;
 
-    if (!providerFailure || last) return { ...result, fallbacksFrom };
-    fallbacksFrom.push(modelId);
+  for (let pass = 0; pass < passes; pass++) {
+    if (pass > 0) await new Promise((r) => setTimeout(r, 30_000));
+    for (const modelId of chain) {
+      result = await runTaskOnce({ ...options, modelId });
+      const providerFailure = result.error?.startsWith("provider error") === true;
+      if (!providerFailure) return { ...result, fallbacksFrom };
+      fallbacksFrom.push(modelId);
+    }
   }
 
-  throw new Error("unreachable: empty model chain");
+  if (!result) throw new Error("unreachable: empty model chain");
+  return { ...result, fallbacksFrom };
 }
 
 async function runTaskOnce(options: TaskRunOptions): Promise<Omit<TaskRunResult, "fallbacksFrom">> {
@@ -152,7 +162,7 @@ async function runTaskOnce(options: TaskRunOptions): Promise<Omit<TaskRunResult,
     (resolveModel(options.modelId) as { contextWindow?: number }).contextWindow ??
     128_000;
 
-  const extensions = options.history
+  const extensions: Extension[] = options.history
     ? [
         createHistoryExtension({
           cacheRoot: join(options.cwd, ".agent", "cache"),
@@ -167,6 +177,13 @@ async function runTaskOnce(options: TaskRunOptions): Promise<Omit<TaskRunResult,
         }) as never,
       ]
     : [];
+
+  // Eval tasks verify by running arbitrary commands, so the harness is the
+  // one caller that legitimately runs in yolo. The deny list still applies.
+  extensions.push({
+    name: "permissions",
+    toolGuards: [createPermissionGuard({ mode: "yolo" })],
+  });
 
   const graphQueries = { count: 0, tokens: 0, results: 0 };
   const graph = options.graph ? await buildGraph(options.cwd) : undefined;
