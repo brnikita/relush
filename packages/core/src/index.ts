@@ -16,6 +16,12 @@ export type {
   TurnPlanner,
 } from "./extensions.ts";
 
+export type { AuditEntry, PermissionMode, PermissionPolicy } from "./permissions.ts";
+export { createPermissionGuard, DEFAULT_ALLOW, DEFAULT_DENY } from "./permissions.ts";
+
+export type { Redaction, SecretPattern, SecretScannerOptions } from "./secrets.ts";
+export { createSecretScanner, redactSecrets, SECRET_PATTERNS } from "./secrets.ts";
+
 export const PACKAGE = "core" as const;
 
 export type { GraphToolDeps } from "./graph-tool.ts";
